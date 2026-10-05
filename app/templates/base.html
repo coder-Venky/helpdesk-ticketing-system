@@ -1,0 +1,653 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="HelpDesk Pro — Professional IT Ticket Management">
+  <title>{% block title %}HelpDesk Pro{% endblock %}</title>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <!-- Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+  <!-- Design System -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+
+  {% block extra_css %}{% endblock %}
+</head>
+<body class="{% if request.cookies.get('theme') == 'light' %}light-mode{% endif %}">
+
+<div class="app-wrapper">
+
+  <!-- ─── Sidebar ──────────────────────────────────────────── -->
+  <aside class="sidebar" id="sidebar" role="navigation" aria-label="Main navigation">
+    <!-- Logo -->
+    <div class="sidebar-logo">
+      <div class="logo-mark" aria-hidden="true">
+        <svg viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="2" y="2" width="7" height="7" rx="2" fill="white" opacity="0.9"/>
+          <rect x="11" y="2" width="7" height="7" rx="2" fill="white" opacity="0.6"/>
+          <rect x="2" y="11" width="7" height="7" rx="2" fill="white" opacity="0.6"/>
+          <rect x="11" y="11" width="7" height="7" rx="2" fill="white" opacity="0.9"/>
+        </svg>
+      </div>
+      <div class="logo-text-wrap">
+        <div class="logo-name">HelpDesk Pro</div>
+        <div class="logo-sub">IT Support System</div>
+      </div>
+    </div>
+
+    <nav class="sidebar-nav">
+      <!-- Main -->
+      <div class="nav-section-label">Main</div>
+
+      <a href="{{ url_for('web.dashboard') }}"
+         class="nav-item {% if request.endpoint == 'web.dashboard' %}active{% endif %}"
+         title="Dashboard">
+        <span class="nav-icon"><i class="fa-solid fa-chart-pie"></i></span>
+        <span class="nav-text">Dashboard</span>
+      </a>
+
+      <a href="{{ url_for('web.tickets') }}"
+         class="nav-item {% if request.endpoint in ('web.tickets', 'web.ticket_detail') %}active{% endif %}"
+         title="All Tickets">
+        <span class="nav-icon"><i class="fa-solid fa-ticket"></i></span>
+        <span class="nav-text">All Tickets</span>
+        {% if open_count is defined and open_count %}
+          <span class="nav-badge" aria-label="{{ open_count }} open tickets">{{ open_count }}</span>
+        {% endif %}
+      </a>
+
+      <a href="{{ url_for('web.new_ticket') }}"
+         class="nav-item {% if request.endpoint == 'web.new_ticket' %}active{% endif %}"
+         title="New Ticket">
+        <span class="nav-icon"><i class="fa-solid fa-circle-plus"></i></span>
+        <span class="nav-text">New Ticket</span>
+      </a>
+
+      {% if current_user and current_user.role in ('admin', 'engineer') %}
+      <!-- Management -->
+      <div class="nav-section-label" style="margin-top:8px;">Management</div>
+
+      {% if current_user.role == 'admin' %}
+      <a href="{{ url_for('web.admin_users') }}"
+         class="nav-item {% if request.endpoint == 'web.admin_users' %}active{% endif %}"
+         title="Users">
+        <span class="nav-icon"><i class="fa-solid fa-users"></i></span>
+        <span class="nav-text">Users</span>
+      </a>
+      {% endif %}
+
+      <a href="/reports"
+         class="nav-item {% if request.path == '/reports' %}active{% endif %}"
+         title="Reports">
+        <span class="nav-icon"><i class="fa-solid fa-chart-line"></i></span>
+        <span class="nav-text">Reports</span>
+      </a>
+      {% endif %}
+
+      <!-- Account -->
+      <div class="nav-section-label" style="margin-top:8px;">Account</div>
+
+      <a href="{{ url_for('web.profile') }}"
+         class="nav-item {% if request.endpoint == 'web.profile' %}active{% endif %}"
+         title="Profile">
+        <span class="nav-icon"><i class="fa-solid fa-circle-user"></i></span>
+        <span class="nav-text">Profile</span>
+      </a>
+
+      <a href="{{ url_for('web.logout') }}" class="nav-item" title="Logout">
+        <span class="nav-icon"><i class="fa-solid fa-right-from-bracket"></i></span>
+        <span class="nav-text">Logout</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <button class="sidebar-toggle" onclick="toggleSidebar()" title="Collapse sidebar" aria-label="Toggle sidebar">
+        <i class="fa-solid fa-bars" id="sidebar-toggle-icon"></i>
+        <span class="nav-text" style="font-size:12px; font-weight:500;">Collapse</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ─── Main Content ──────────────────────────────────────── -->
+  <div class="main-content" id="main-content">
+
+    <!-- Topbar -->
+    <header class="topbar" role="banner">
+      <!-- Mobile hamburger -->
+      <button class="topbar-btn" id="mobile-menu-btn"
+              onclick="toggleMobileSidebar()"
+              style="display:none;" aria-label="Open menu">
+        <i class="fa-solid fa-bars"></i>
+      </button>
+
+      <!-- Page title -->
+      <div class="topbar-left">
+        <div class="topbar-title">{% block page_title %}Dashboard{% endblock %}</div>
+        <div class="topbar-subtitle">{% block page_subtitle %}{% endblock %}</div>
+      </div>
+
+      <!-- Global Search -->
+      <div class="topbar-search" role="search">
+        <i class="fa-solid fa-magnifying-glass search-icon" aria-hidden="true"></i>
+        <input type="search"
+               id="global-search"
+               placeholder="Search tickets... (Press / to focus)"
+               autocomplete="off"
+               aria-label="Search tickets">
+        <div class="search-results hidden" id="search-results" role="listbox"></div>
+      </div>
+
+      <div class="topbar-actions">
+        <!-- Theme Toggle -->
+        <button class="topbar-btn" id="theme-toggle" onclick="toggleTheme()" title="Toggle theme" aria-label="Toggle dark/light mode">
+          <i class="fa-solid fa-moon" id="theme-icon"></i>
+        </button>
+
+        <!-- Keyboard Shortcuts -->
+        <button class="topbar-btn" onclick="showShortcuts()" title="Keyboard shortcuts (?)" aria-label="View keyboard shortcuts">
+          <i class="fa-solid fa-keyboard"></i>
+        </button>
+
+        <!-- Notifications -->
+        <div style="position:relative;">
+          <button class="topbar-btn" id="notif-btn" onclick="toggleNotifications()" title="Notifications" aria-label="Notifications" aria-haspopup="true">
+            <i class="fa-solid fa-bell"></i>
+            {% if unread_count and unread_count > 0 %}
+            <span class="notif-badge" id="notif-badge" aria-label="{{ unread_count }} unread">
+              {{ unread_count if unread_count < 100 else '99+' }}
+            </span>
+            {% endif %}
+          </button>
+          <div class="notif-dropdown hidden" id="notif-dropdown" role="menu">
+            <div class="notif-header">
+              <span style="font-size:13.5px; font-weight:700;">Notifications</span>
+              <button onclick="markAllRead()" class="btn btn-ghost btn-sm" style="font-size:11px; padding:4px 8px;">
+                Mark all read
+              </button>
+            </div>
+            <div id="notif-list">
+              <div style="padding:24px; text-align:center; color:var(--text-muted); font-size:12.5px;">
+                <i class="fa-solid fa-bell-slash" style="font-size:22px; margin-bottom:8px; display:block; opacity:0.4;"></i>
+                Loading notifications...
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- User Menu -->
+        {% if current_user %}
+        <a href="{{ url_for('web.profile') }}" class="user-avatar-btn" aria-label="Profile">
+          <div class="user-avatar" aria-hidden="true">{{ current_user.name[0].upper() }}</div>
+          <div style="display:flex; flex-direction:column; gap:1px; line-height:1.2;">
+            <span style="font-size:12.5px; font-weight:600;">{{ current_user.name.split()[0] }}</span>
+            <span style="font-size:10px; color:var(--text-muted); text-transform:capitalize;">{{ current_user.role }}</span>
+          </div>
+        </a>
+        {% endif %}
+      </div>
+    </header>
+
+    <!-- Mobile overlay -->
+    <div id="mobile-overlay" onclick="closeMobileSidebar()"
+         style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:999; backdrop-filter:blur(2px);"></div>
+
+    <!-- Page Content -->
+    <main class="page-content" id="page-content" role="main">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+
+<!-- Toast Container -->
+<div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+
+<!-- Keyboard Shortcuts Modal -->
+<div class="modal-backdrop-custom hidden" id="shortcuts-modal" onclick="closeShortcuts()" role="dialog" aria-modal="true" aria-labelledby="shortcuts-title">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-header">
+      <h5 id="shortcuts-title"><i class="fa-solid fa-keyboard" style="color:var(--brand-glow); margin-right:8px;"></i>Keyboard Shortcuts</h5>
+      <button class="btn btn-ghost btn-icon" onclick="closeShortcuts()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <div class="kbd-grid">
+        <div class="kbd-item"><span>New Ticket</span><kbd class="kbd">N</kbd></div>
+        <div class="kbd-item"><span>Search</span><kbd class="kbd">/</kbd></div>
+        <div class="kbd-item"><span>Dashboard</span><kbd class="kbd">G D</kbd></div>
+        <div class="kbd-item"><span>All Tickets</span><kbd class="kbd">G T</kbd></div>
+        <div class="kbd-item"><span>Toggle theme</span><kbd class="kbd">Shift T</kbd></div>
+        <div class="kbd-item"><span>Shortcuts</span><kbd class="kbd">?</kbd></div>
+        <div class="kbd-item"><span>Close modal</span><kbd class="kbd">Esc</kbd></div>
+        <div class="kbd-item"><span>Profile</span><kbd class="kbd">G P</kbd></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Global JavaScript ───────────────────────────────────── -->
+<script>
+// ─── Theme ────────────────────────────────────────────────
+const _savedTheme = localStorage.getItem('hd-theme') || 'dark';
+document.body.classList.toggle('light-mode', _savedTheme === 'light');
+updateThemeIcon(_savedTheme);
+
+function toggleTheme() {
+  const isLight = document.body.classList.toggle('light-mode');
+  const theme = isLight ? 'light' : 'dark';
+  localStorage.setItem('hd-theme', theme);
+  document.cookie = `theme=${theme};path=/;max-age=31536000`;
+  updateThemeIcon(theme);
+  showToast(`${isLight ? '☀️ Light' : '🌙 Dark'} mode`, 'info', 2000);
+}
+
+function updateThemeIcon(theme) {
+  const icon = document.getElementById('theme-icon');
+  if (icon) icon.className = theme === 'light' ? 'fa-solid fa-sun' : 'fa-solid fa-moon';
+}
+
+// ─── Sidebar ───────────────────────────────────────────────
+const _sbCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+if (_sbCollapsed) {
+  document.getElementById('sidebar')?.classList.add('collapsed');
+  document.getElementById('main-content')?.classList.add('collapsed');
+}
+
+function toggleSidebar() {
+  const sb = document.getElementById('sidebar');
+  const mc = document.getElementById('main-content');
+  const isCollapsed = sb.classList.toggle('collapsed');
+  mc.classList.toggle('collapsed', isCollapsed);
+  localStorage.setItem('sidebar-collapsed', isCollapsed);
+}
+
+// Mobile sidebar
+function toggleMobileSidebar() {
+  document.getElementById('sidebar').classList.toggle('mobile-open');
+  document.getElementById('mobile-overlay').style.display = 'block';
+}
+
+function closeMobileSidebar() {
+  document.getElementById('sidebar').classList.remove('mobile-open');
+  document.getElementById('mobile-overlay').style.display = 'none';
+}
+
+// Show mobile hamburger on small screens
+function handleResize() {
+  const mobileBtn = document.getElementById('mobile-menu-btn');
+  if (mobileBtn) mobileBtn.style.display = window.innerWidth <= 768 ? 'flex' : 'none';
+}
+window.addEventListener('resize', handleResize);
+handleResize();
+
+// ─── JWT / API ─────────────────────────────────────────────
+const API = {
+  _tokenReady: null,
+
+  async ensureToken() {
+    if (API._tokenReady) return API._tokenReady;
+    API._tokenReady = (async () => {
+      const ok = await API.bootstrapToken();
+      if (!ok) await API._cookieRefresh();
+    })();
+    return API._tokenReady;
+  },
+
+  async request(url, options = {}) {
+    await API.ensureToken();
+    const token = localStorage.getItem('access_token');
+    const headers = { 'Content-Type': 'application/json', ...options.headers };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    let resp = await fetch(url, { ...options, headers, credentials: 'include' });
+
+    if (resp.status === 401) {
+      let errCode = '';
+      try { const d = await resp.clone().json(); errCode = d.code || ''; } catch(e) {}
+      if (errCode === 'invalid_token') {
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+      }
+      const refreshed = await API.refreshToken();
+      if (refreshed) {
+        headers['Authorization'] = `Bearer ${localStorage.getItem('access_token')}`;
+        resp = await fetch(url, { ...options, headers, credentials: 'include' });
+      } else {
+        window.location.href = '/login';
+        return null;
+      }
+    }
+    return resp;
+  },
+
+  async _cookieRefresh() {
+    try {
+      const resp = await fetch('/api/auth/refresh', { method: 'POST', credentials: 'include' });
+      if (resp.ok) {
+        const data = await resp.json();
+        localStorage.setItem('access_token', data.data.access_token);
+        return true;
+      }
+    } catch(e) {}
+    return false;
+  },
+
+  async refreshToken() {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (refreshToken) {
+      try {
+        const resp = await fetch('/api/auth/refresh', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${refreshToken}` },
+          credentials: 'include'
+        });
+        if (resp.ok) {
+          const data = await resp.json();
+          localStorage.setItem('access_token', data.data.access_token);
+          return true;
+        }
+      } catch(e) {}
+    }
+    if (await API._cookieRefresh()) return true;
+    return await API.bootstrapToken();
+  },
+
+  async bootstrapToken() {
+    try {
+      const resp = await fetch('/api/auth/token-from-session', {
+        method: 'POST', credentials: 'include'
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        localStorage.setItem('access_token', data.data.access_token);
+        localStorage.setItem('refresh_token', data.data.refresh_token);
+        return true;
+      }
+    } catch(e) {}
+    return false;
+  },
+
+  get:    (url)       => API.request(url, { method: 'GET' }),
+  post:   (url, body) => API.request(url, { method: 'POST',   body: JSON.stringify(body) }),
+  put:    (url, body) => API.request(url, { method: 'PUT',    body: JSON.stringify(body) }),
+  patch:  (url, body) => API.request(url, { method: 'PATCH',  body: JSON.stringify(body) }),
+  delete: (url)       => API.request(url, { method: 'DELETE' }),
+};
+API.ensureToken();
+
+// ─── Toasts ────────────────────────────────────────────────
+function showToast(message, type = 'info', duration = 4000) {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast-item ${type}`;
+  toast.setAttribute('role', 'alert');
+  toast.innerHTML = `
+    <span class="toast-icon" aria-hidden="true">${icons[type]}</span>
+    <div class="toast-body"><div class="toast-msg">${message}</div></div>
+  `;
+  toast.onclick = () => toast.remove();
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'all 0.3s ease';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// ─── Notifications ─────────────────────────────────────────
+let _notifOpen = false;
+
+function toggleNotifications() {
+  const dd = document.getElementById('notif-dropdown');
+  _notifOpen = !_notifOpen;
+  dd.classList.toggle('hidden', !_notifOpen);
+  if (_notifOpen) loadNotifications();
+}
+
+document.addEventListener('click', (e) => {
+  if (_notifOpen && !e.target.closest('#notif-btn') && !e.target.closest('#notif-dropdown')) {
+    document.getElementById('notif-dropdown')?.classList.add('hidden');
+    _notifOpen = false;
+  }
+});
+
+async function loadNotifications() {
+  const list = document.getElementById('notif-list');
+  try {
+    const resp = await API.get('/api/notifications');
+    if (!resp || !resp.ok) return;
+    const data = await resp.json();
+    const notifs = data.data?.notifications || [];
+    const badge = document.getElementById('notif-badge');
+    const unread = data.data?.unread_count || 0;
+
+    if (badge) {
+      badge.textContent = unread > 99 ? '99+' : unread;
+      badge.style.display = unread > 0 ? 'flex' : 'none';
+    } else if (unread > 0) {
+      // Create badge dynamically
+      const btn = document.getElementById('notif-btn');
+      const b = document.createElement('span');
+      b.id = 'notif-badge'; b.className = 'notif-badge';
+      b.textContent = unread > 99 ? '99+' : unread;
+      btn.appendChild(b);
+    }
+
+    if (!notifs.length) {
+      list.innerHTML = `
+        <div style="padding:32px 16px; text-align:center; color:var(--text-muted);">
+          <i class="fa-solid fa-bell-slash" style="font-size:26px; margin-bottom:10px; display:block; opacity:0.35;"></i>
+          <div style="font-size:13px; font-weight:500;">You're all caught up!</div>
+          <div style="font-size:11.5px; margin-top:4px;">No new notifications</div>
+        </div>`;
+      return;
+    }
+
+    const notifIcons = {
+      ticket_assigned: 'fa-user-check',
+      new_comment: 'fa-comment',
+      ticket_escalated: 'fa-fire',
+      sla_warning: 'fa-clock',
+      ticket_closed: 'fa-circle-check',
+      ticket_resolved: 'fa-circle-check',
+    };
+
+    list.innerHTML = notifs.map(n => `
+      <div class="notif-item ${!n.is_read ? 'unread' : ''}"
+           onclick="goNotif('${n.link || '#'}', ${n.id})"
+           role="menuitem">
+        <div class="notif-icon">
+          <i class="fa-solid ${notifIcons[n.type] || 'fa-bell'}"></i>
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div class="notif-title">${escapeHtml(n.title)}</div>
+          <div class="notif-msg">${escapeHtml(n.message)}</div>
+          <div class="notif-time">${timeAgo(n.created_at)}</div>
+        </div>
+        ${!n.is_read ? '<div class="notif-dot" style="position:static;margin-top:6px;"></div>' : ''}
+      </div>`).join('');
+  } catch(e) {
+    list.innerHTML = `<div style="padding:16px; color:var(--error); font-size:12px; text-align:center;">Failed to load notifications</div>`;
+  }
+}
+
+async function goNotif(link, id) {
+  await API.post('/api/notifications/mark-read', { ids: [id] });
+  if (link && link !== '#') window.location.href = link;
+}
+
+async function markAllRead() {
+  await API.post('/api/notifications/mark-read', {});
+  const badge = document.getElementById('notif-badge');
+  if (badge) badge.style.display = 'none';
+  loadNotifications();
+  showToast('All notifications marked as read', 'success', 2500);
+}
+
+// Poll notifications
+setInterval(() => {
+  if (_notifOpen) loadNotifications();
+  else {
+    API.get('/api/notifications').then(r => r?.json()).then(d => {
+      const badge = document.getElementById('notif-badge');
+      const count = d?.data?.unread_count || 0;
+      if (badge) {
+        badge.textContent = count > 99 ? '99+' : count;
+        badge.style.display = count > 0 ? 'flex' : 'none';
+      }
+    }).catch(() => {});
+  }
+}, 30000);
+
+// ─── Global Search ─────────────────────────────────────────
+let _searchTimeout;
+const _searchInput = document.getElementById('global-search');
+const _searchResults = document.getElementById('search-results');
+
+if (_searchInput) {
+  _searchInput.addEventListener('input', (e) => {
+    clearTimeout(_searchTimeout);
+    const q = e.target.value.trim();
+    if (q.length < 2) { _searchResults?.classList.add('hidden'); return; }
+    _searchTimeout = setTimeout(() => runSearch(q), 300);
+  });
+
+  _searchInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      _searchInput.value = '';
+      _searchResults?.classList.add('hidden');
+    }
+  });
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.topbar-search')) _searchResults?.classList.add('hidden');
+  });
+}
+
+async function runSearch(q) {
+  if (!_searchResults) return;
+  _searchResults.classList.remove('hidden');
+  _searchResults.innerHTML = `<div style="padding:12px; text-align:center; color:var(--text-muted); font-size:12px;"><span class="spinner dark" style="width:14px;height:14px;margin-right:6px;display:inline-block;vertical-align:middle;"></span>Searching...</div>`;
+
+  try {
+    const resp = await API.get(`/api/tickets?search=${encodeURIComponent(q)}&per_page=6`);
+    if (!resp || !resp.ok) return;
+    const { data } = await resp.json();
+    const tickets = data.tickets || [];
+
+    if (!tickets.length) {
+      _searchResults.innerHTML = `<div style="padding:16px; text-align:center; color:var(--text-muted); font-size:12px;">No results for "${escapeHtml(q)}"</div>`;
+      return;
+    }
+
+    _searchResults.innerHTML = tickets.map(t => `
+      <a href="/tickets/${t.id}" class="search-result-item" role="option">
+        <span class="ticket-number">${t.ticket_number}</span>
+        <span style="flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:13px;">${escapeHtml(t.title)}</span>
+        <span class="badge-status badge-${t.status}" style="font-size:9.5px;">${t.status.replace('_',' ')}</span>
+      </a>`).join('');
+  } catch(e) {
+    _searchResults.innerHTML = `<div style="padding:12px; color:var(--error); font-size:12px;">Search failed</div>`;
+  }
+}
+
+// ─── Keyboard Shortcuts ────────────────────────────────────
+let _kbSeq = [];
+let _kbTimer;
+
+document.addEventListener('keydown', (e) => {
+  const tag = e.target.tagName;
+  const isInput = ['INPUT','TEXTAREA','SELECT'].includes(tag);
+
+  // Focus search
+  if (e.key === '/' && !isInput) {
+    e.preventDefault();
+    document.getElementById('global-search')?.focus();
+    return;
+  }
+
+  // Escape
+  if (e.key === 'Escape') {
+    closeShortcuts();
+    document.getElementById('notif-dropdown')?.classList.add('hidden');
+    _notifOpen = false;
+    document.getElementById('global-search')?.blur();
+    return;
+  }
+
+  if (isInput) return;
+
+  // Single key
+  if (e.key === '?') { e.preventDefault(); showShortcuts(); return; }
+  if (e.key === 'n' || e.key === 'N') {
+    e.preventDefault();
+    window.location.href = '{{ url_for("web.new_ticket") }}';
+    return;
+  }
+  if (e.shiftKey && e.key === 'T') { e.preventDefault(); toggleTheme(); return; }
+
+  // Sequence keys (G + X)
+  _kbSeq.push(e.key.toLowerCase());
+  clearTimeout(_kbTimer);
+  _kbTimer = setTimeout(() => _kbSeq = [], 800);
+
+  if (_kbSeq.length === 2 && _kbSeq[0] === 'g') {
+    const dest = { d: '/dashboard', t: '/tickets', p: '/profile' }[_kbSeq[1]];
+    if (dest) { e.preventDefault(); window.location.href = dest; }
+    _kbSeq = [];
+  }
+});
+
+function showShortcuts() { document.getElementById('shortcuts-modal')?.classList.remove('hidden'); }
+function closeShortcuts() { document.getElementById('shortcuts-modal')?.classList.add('hidden'); }
+
+// ─── Helpers ───────────────────────────────────────────────
+function timeAgo(isoStr) {
+  const diff = Math.floor((Date.now() - new Date(isoStr)) / 1000);
+  if (diff < 60) return 'just now';
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  if (diff < 604800) return `${Math.floor(diff/86400)}d ago`;
+  return new Date(isoStr).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function fmtDateTime(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;');
+}
+
+// Animate number count-up
+function animateCount(el, target, duration = 800) {
+  const start = performance.now();
+  const update = (t) => {
+    const progress = Math.min((t - start) / duration, 1);
+    const ease = 1 - Math.pow(1 - progress, 3);
+    el.textContent = Math.round(ease * target);
+    if (progress < 1) requestAnimationFrame(update);
+    else el.textContent = target;
+  };
+  requestAnimationFrame(update);
+}
+</script>
+
+{% block extra_js %}{% endblock %}
+</body>
+</html>

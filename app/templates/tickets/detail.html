@@ -1,0 +1,653 @@
+{% extends 'base.html' %}
+{% block title %}{{ ticket.ticket_number }} — HelpDesk Pro{% endblock %}
+{% block page_title %}
+  <span style="font-size:12px; font-weight:500; color:var(--brand-glow); font-family:monospace; background:var(--brand-subtle); padding:3px 10px; border-radius:20px;">{{ ticket.ticket_number }}</span>
+{% endblock %}
+{% block page_subtitle %}
+  <a href="{{ url_for('web.tickets') }}" style="color:var(--text-muted); text-decoration:none; font-size:12px; display:flex; align-items:center; gap:4px;">
+    <i class="fa-solid fa-arrow-left" style="font-size:10px;"></i> All Tickets
+  </a>
+{% endblock %}
+
+{% block content %}
+<div style="display:grid; grid-template-columns:1fr 310px; gap:16px; align-items:start;" id="detail-grid">
+
+  <!-- ─── Main Column ───────────────────────────────────── -->
+  <div>
+    <!-- Ticket Header Card -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header">
+        <div style="flex:1;">
+          <h2 style="font-size:18px; font-weight:700; color:var(--text-primary); margin-bottom:8px; line-height:1.3;">
+            {{ ticket.title }}
+          </h2>
+          <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+            <span class="badge-status badge-{{ ticket.status }}">{{ ticket.status.replace('_',' ') }}</span>
+            <span class="badge-priority badge-{{ ticket.priority }}">{{ ticket.priority }}</span>
+            <span style="font-size:11.5px; color:var(--text-muted);">
+              <i class="fa-solid fa-folder" style="margin-right:3px;"></i>{{ ticket.category }}
+            </span>
+            {% if ticket.tags %}
+              <span style="font-size:11px; color:var(--text-muted); font-weight:500;"><i class="fa-solid fa-tag" style="margin-right:3px;"></i>Sub-Category:</span>
+              {% for tag in ticket.tags.split(',') %}
+              <span class="tag-chip">{{ tag.strip() }}</span>
+              {% endfor %}
+            {% endif %}
+          </div>
+        </div>
+        {% if current_user.role in ('admin', 'engineer') %}
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <button class="btn btn-secondary btn-sm" onclick="toggleEditPanel()">
+            <i class="fa-solid fa-pen-to-square"></i> Edit
+          </button>
+          {% if current_user.role == 'admin' %}
+          <button class="btn btn-danger btn-sm" onclick="openDeleteModal()">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="card-body">
+        <div style="font-size:13.5px; color:var(--text-secondary); white-space:pre-wrap; line-height:1.8;">{{ ticket.description }}</div>
+
+        {% if ticket.due_date %}
+        <div style="margin-top:14px; padding:10px 14px; background:rgba(245,158,11,0.07); border:1px solid rgba(245,158,11,0.2); border-radius:var(--radius-sm); font-size:12.5px; color:#fbbf24; display:flex; align-items:center; gap:8px;">
+          <i class="fa-solid fa-clock"></i>
+          <span>Due: {{ ticket.due_date.strftime('%B %d, %Y at %H:%M') }} UTC</span>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Edit Panel (collapsible) -->
+    {% if current_user.role in ('admin', 'engineer') %}
+    <div class="card hidden" id="edit-panel" style="margin-bottom:14px; border-color:rgba(37,99,235,0.3);">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-pen-to-square" style="color:var(--brand-glow);"></i> Update Ticket</span>
+        <button onclick="toggleEditPanel()" class="btn btn-ghost btn-icon" aria-label="Close edit panel">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="card-body">
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Status</label>
+            <select class="form-select" id="edit-status">
+              {% for s in statuses %}
+              <option value="{{ s }}" {% if s == ticket.status %}selected{% endif %}>{{ s.replace('_',' ').title() }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Priority</label>
+            <select class="form-select" id="edit-priority">
+              {% for p in priorities %}
+              <option value="{{ p }}" {% if p == ticket.priority %}selected{% endif %}>{{ p.title() }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        {% if current_user.role == 'admin' %}
+        <div class="form-group">
+          <label class="form-label">Assign To Engineer</label>
+          <select class="form-select" id="assign-engineer">
+            <option value="">Unassigned</option>
+            {% for eng in engineers %}
+            <option value="{{ eng.id }}" {% if ticket.assigned_to_id == eng.id %}selected{% endif %}>
+              {{ eng.name }} ({{ eng.role }})
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+
+        <div style="display:flex; gap:8px; padding-top:4px;">
+          <button class="btn btn-primary" onclick="updateTicket()">
+            <i class="fa-solid fa-floppy-disk"></i> Save Changes
+          </button>
+          {% if current_user.role == 'admin' %}
+          <button class="btn btn-secondary" onclick="assignTicket()">
+            <i class="fa-solid fa-user-check"></i> Assign
+          </button>
+          {% endif %}
+          <button class="btn btn-ghost" onclick="toggleEditPanel()">Cancel</button>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Attachments -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-paperclip" style="color:var(--brand-glow);"></i> Attachments</span>
+        <button class="btn btn-secondary btn-sm" onclick="document.getElementById('attach-input').click()">
+          <i class="fa-solid fa-cloud-arrow-up"></i> Upload
+        </button>
+        <input type="file" id="attach-input" hidden multiple
+               onchange="uploadAttachment(this)"
+               accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip">
+      </div>
+      <div id="attachments-list" class="card-body" style="min-height:60px; padding:14px 20px;">
+        {% set atts = ticket.attachments.all() %}
+        {% if atts %}
+          {% for att in atts %}
+          <div style="display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--border);">
+            <div style="width:34px; height:34px; border-radius:var(--radius-xs); background:var(--brand-subtle); display:flex; align-items:center; justify-content:center; flex-shrink:0;">
+              <i class="fa-solid fa-file" style="color:var(--brand-glow); font-size:15px;"></i>
+            </div>
+            <div style="flex:1; min-width:0;">
+              <div style="font-size:13px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">{{ att.original_filename }}</div>
+              <div style="font-size:11px; color:var(--text-muted);">{{ att.size_human() }} · {{ att.created_at.strftime('%b %d, %Y') }}</div>
+            </div>
+            <a href="/api/tickets/attachments/{{ att.id }}/download"
+               class="btn btn-secondary btn-sm" title="Download" aria-label="Download {{ att.original_filename }}">
+              <i class="fa-solid fa-download"></i>
+            </a>
+          </div>
+          {% endfor %}
+        {% else %}
+          <div class="empty-state" style="padding:20px;">
+            <div class="empty-icon" style="width:40px;height:40px;font-size:16px;"><i class="fa-solid fa-paperclip"></i></div>
+            <div style="font-size:12.5px; color:var(--text-muted);">No attachments yet</div>
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Comments -->
+    <div class="card" style="margin-bottom:14px;">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-comments" style="color:var(--brand-glow);"></i> Comments</span>
+        <span style="font-size:12px; color:var(--text-muted);" id="comment-count">
+          {% set user_comments = ticket.comments.order_by('created_at').all() %}
+          {{ user_comments | length }} comment{{ 's' if user_comments | length != 1 else '' }}
+        </span>
+      </div>
+
+      <!-- Existing comments -->
+      <div id="comments-section" style="padding:0 20px; max-height:500px; overflow-y:auto;">
+        {% set user_comments = ticket.comments.order_by('created_at').all() %}
+        {% if user_comments %}
+          {% for c in user_comments %}
+          {% if not c.is_internal or current_user.role in ('admin', 'engineer') %}
+          <div class="comment-item {% if c.is_internal %}comment-internal{% endif %}">
+            <div class="comment-avatar" aria-hidden="true">{{ c.author.name[0].upper() if c.author else '?' }}</div>
+            <div class="comment-bubble {% if c.author and c.author.id == current_user.id %}own{% endif %}" style="flex:1;">
+              <div class="comment-meta">
+                <strong>{{ c.author.name if c.author else 'Unknown' }}</strong>
+                {% if c.author %}
+                <span class="badge-role {{ c.author.role }}">{{ c.author.role }}</span>
+                {% endif %}
+                {% if c.is_internal %}<span class="comment-internal-tag">🔒 Internal</span>{% endif %}
+                <span style="margin-left:auto;">{{ c.created_at.strftime('%b %d, %Y at %H:%M') }}</span>
+              </div>
+              <div class="comment-text">{{ c.body }}</div>
+            </div>
+          </div>
+          {% endif %}
+          {% endfor %}
+        {% else %}
+          <div style="padding:24px; text-align:center; color:var(--text-muted); font-size:13px;">
+            <i class="fa-solid fa-comment-slash" style="font-size:20px; margin-bottom:8px; display:block; opacity:0.3;"></i>
+            No comments yet. Be the first to comment!
+          </div>
+        {% endif %}
+      </div>
+
+      <!-- Add comment -->
+      <div class="comment-form">
+        <div style="display:flex; gap:10px; align-items:flex-start;">
+          <div class="comment-avatar" aria-hidden="true" style="flex-shrink:0;">
+            {{ current_user.name[0].upper() }}
+          </div>
+          <div style="flex:1;">
+            <textarea class="form-control" id="comment-text" rows="3"
+                      placeholder="Add a comment… (Ctrl+Enter to submit)"
+                      style="resize:vertical;" aria-label="Comment text"></textarea>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-top:10px;">
+              <div style="display:flex; align-items:center; gap:10px;">
+                {% if current_user.role in ('admin', 'engineer') %}
+                <label style="display:flex; align-items:center; gap:6px; font-size:12px; color:var(--text-secondary); cursor:pointer;">
+                  <input type="checkbox" id="is-internal" style="accent-color:var(--warning); width:14px; height:14px;">
+                  🔒 Internal note
+                </label>
+                {% endif %}
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="submitComment()" id="comment-btn">
+                <i class="fa-solid fa-paper-plane"></i> Post Comment
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Activity Timeline -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-timeline" style="color:var(--brand-glow);"></i> Activity Log</span>
+      </div>
+      <div class="card-body" style="padding:16px 20px;">
+        <div class="timeline">
+          {% set logs = ticket.activity_logs.order_by('created_at').all() %}
+          {% if logs %}
+            {% for log in logs %}
+            <div class="activity-item">
+              <div class="activity-dot"></div>
+              <div class="activity-content">
+                <div class="activity-text">
+                  <strong>{{ log.user.name if log.user else 'System' }}</strong>
+                  {{ log.description or log.action }}
+                  {% if log.old_value and log.new_value %}
+                  <span style="color:var(--text-muted);">{{ log.old_value }}</span>
+                  → <span style="color:var(--text-primary);">{{ log.new_value }}</span>
+                  {% endif %}
+                </div>
+                <div class="activity-time">{{ log.created_at.strftime('%b %d, %Y at %H:%M') }} UTC</div>
+              </div>
+            </div>
+            {% endfor %}
+          {% else %}
+            <div style="color:var(--text-muted); font-size:12.5px; text-align:center; padding:12px;">
+              No activity recorded yet.
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Right Sidebar ─────────────────────────────────── -->
+  <div>
+    <!-- Quick Actions -->
+    {% if current_user.role in ('admin', 'engineer') %}
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header"><span class="card-title">Quick Actions</span></div>
+      <div class="card-body" style="display:flex; flex-direction:column; gap:6px; padding:14px;">
+        {% if ticket.status == 'open' %}
+        <button class="btn btn-warning w-full" style="justify-content:flex-start;"
+          onclick="{% if current_user.role == 'admin' %}openStartWorkingModal(){% else %}quickStatus('in_progress'){% endif %}">
+          <i class="fa-solid fa-play"></i> Start Working
+        </button>
+        {% endif %}
+        {% if ticket.status in ('open', 'in_progress') %}
+        <button class="btn btn-success w-full" style="justify-content:flex-start;" onclick="quickStatus('resolved')">
+          <i class="fa-solid fa-circle-check"></i> Mark Resolved
+        </button>
+        {% endif %}
+        {% if ticket.status in ('open', 'in_progress') %}
+        <button class="btn btn-primary w-full" style="justify-content:flex-start;" onclick="openEditPanelFocused()">
+          <i class="fa-solid fa-user-check"></i> Assign Engineer
+        </button>
+        {% endif %}
+        {% if ticket.status != 'closed' %}
+        <button class="btn btn-secondary w-full" style="justify-content:flex-start;" onclick="quickStatus('closed')">
+          <i class="fa-solid fa-lock"></i> Close Ticket
+        </button>
+        {% endif %}
+        {% if ticket.status == 'closed' or ticket.status == 'resolved' %}
+        <button class="btn btn-secondary w-full" style="justify-content:flex-start;" onclick="quickStatus('open')">
+          <i class="fa-solid fa-rotate-left"></i> Reopen
+        </button>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Ticket Info -->
+    <div class="card" style="margin-bottom:12px;">
+      <div class="card-header"><span class="card-title">Ticket Details</span></div>
+      <div class="card-body" style="padding:14px 18px;">
+        <div class="info-row">
+          <div class="info-row-label">Ticket Number</div>
+          <div class="info-row-value" style="font-family:monospace; color:var(--brand-glow);">{{ ticket.ticket_number }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-row-label">Status</div>
+          <div class="info-row-value"><span class="badge-status badge-{{ ticket.status }}">{{ ticket.status.replace('_',' ') }}</span></div>
+        </div>
+        <div class="info-row">
+          <div class="info-row-label">Priority</div>
+          <div class="info-row-value"><span class="badge-priority badge-{{ ticket.priority }}">{{ ticket.priority }}</span></div>
+        </div>
+        <div class="info-row">
+          <div class="info-row-label">Category</div>
+          <div class="info-row-value">{{ ticket.category }}</div>
+        </div>
+        <hr class="divider">
+        <div class="info-row">
+          <div class="info-row-label">Created By</div>
+          <div class="info-row-value">{{ ticket.creator.name if ticket.creator else 'Unknown' }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-row-label">Raised At</div>
+          <div class="info-row-value">{{ ticket.created_at.strftime('%b %d, %Y %H:%M') }} UTC</div>
+        </div>
+        <div class="info-row">
+          <div class="info-row-label">Last Updated</div>
+          <div class="info-row-value">{{ ticket.updated_at.strftime('%b %d, %Y %H:%M') + ' UTC' if ticket.updated_at else 'Never' }}</div>
+        </div>
+        {% if ticket.resolved_at %}
+        <div class="info-row">
+          <div class="info-row-label">Resolved At</div>
+          <div class="info-row-value">{{ ticket.resolved_at.strftime('%b %d, %Y %H:%M') }} UTC</div>
+        </div>
+        <div class="info-row">
+          <div class="info-row-label">Resolution Time</div>
+          <div class="info-row-value">{{ ticket.resolution_time_hours() }} hours</div>
+        </div>
+        {% endif %}
+        {% if ticket.due_date %}
+        <div class="info-row">
+          <div class="info-row-label">Due Date</div>
+          <div class="info-row-value" style="color:var(--warning);">{{ ticket.due_date.strftime('%b %d, %Y') }}</div>
+        </div>
+        {% endif %}
+        {% if ticket.tags %}
+        <div class="info-row" style="flex-direction:column; align-items:flex-start; gap:6px;">
+          <div class="info-row-label"><i class="fa-solid fa-tag" style="margin-right:3px;"></i>Sub-Category</div>
+          <div style="display:flex; flex-wrap:wrap; gap:4px;">
+            {% for tag in ticket.tags.split(',') %}
+            <span class="tag-chip">{{ tag.strip() }}</span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+        <hr class="divider">
+        <!-- Assigned To -->
+        <div class="info-row-label">Assigned To</div>
+        {% if ticket.assignee %}
+        <div style="display:flex; align-items:center; gap:10px; margin-top:6px;">
+          <div class="user-avatar" style="width:36px; height:36px; font-size:14px; flex-shrink:0;">
+            {{ ticket.assignee.name[0] }}
+          </div>
+          <div>
+            <div style="font-size:13px; font-weight:600;">{{ ticket.assignee.name }}</div>
+            <div style="font-size:10.5px; color:var(--text-muted);">{{ ticket.assignee.role }}</div>
+          </div>
+        </div>
+        {% else %}
+        <div style="font-size:13px; color:var(--text-muted); font-style:italic; margin-top:6px;">Unassigned</div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Customer / Creator info -->
+    {% if ticket.creator %}
+    <div class="card">
+      <div class="card-header"><span class="card-title">Customer Details</span></div>
+      <div class="card-body" style="padding:14px 18px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:12px;">
+          <div class="user-avatar" style="width:40px;height:40px;font-size:15px;">{{ ticket.creator.name[0] }}</div>
+          <div>
+            <div style="font-size:13.5px; font-weight:600;">{{ ticket.creator.name }}</div>
+            <div style="font-size:11px; color:var(--text-muted);">{{ ticket.creator.email }}</div>
+          </div>
+        </div>
+        {% if ticket.creator.department %}
+        <div class="info-row">
+          <div class="info-row-label">Department</div>
+          <div class="info-row-value">{{ ticket.creator.department }}</div>
+        </div>
+        {% endif %}
+        <div class="info-row">
+          <div class="info-row-label">Role</div>
+          <div class="info-row-value"><span class="badge-role {{ ticket.creator.role }}">{{ ticket.creator.role }}</span></div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Start Working Modal (admin) -->
+<div class="modal-backdrop-custom hidden" id="start-working-modal" role="dialog" aria-modal="true">
+  <div class="modal-box" style="max-width:440px;">
+    <div class="modal-header">
+      <h5><i class="fa-solid fa-play" style="color:var(--warning); margin-right:8px;"></i>Start Working — Choose Option</h5>
+      <button class="btn btn-ghost btn-icon" onclick="closeStartWorkingModal()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body" style="display:flex; flex-direction:column; gap:10px; padding:18px 20px;">
+      <p style="font-size:13px; color:var(--text-secondary); margin-bottom:6px;">How do you want to proceed with <strong style="color:var(--text-primary);">{{ ticket.ticket_number }}</strong>?</p>
+
+      <!-- Option 1 -->
+      <button class="btn btn-warning w-full" style="justify-content:flex-start; gap:12px; padding:12px 14px;"
+        onclick="startWorkingOption('self_assign')">
+        <i class="fa-solid fa-user-check" style="font-size:16px;"></i>
+        <div style="text-align:left;">
+          <div style="font-weight:600;">Self-Assign &amp; Start</div>
+          <div style="font-size:11.5px; opacity:0.8; margin-top:2px;">Assign to yourself and move to In Progress</div>
+        </div>
+      </button>
+
+      <!-- Option 2 -->
+      <button class="btn btn-primary w-full" style="justify-content:flex-start; gap:12px; padding:12px 14px;"
+        onclick="startWorkingOption('assign_engineer')">
+        <i class="fa-solid fa-users" style="font-size:16px;"></i>
+        <div style="text-align:left;">
+          <div style="font-weight:600;">Assign to Engineer</div>
+          <div style="font-size:11.5px; opacity:0.8; margin-top:2px;">Pick an engineer and move to In Progress</div>
+        </div>
+      </button>
+
+      <!-- Option 3 -->
+      <button class="btn btn-secondary w-full" style="justify-content:flex-start; gap:12px; padding:12px 14px;"
+        onclick="startWorkingOption('just_start')">
+        <i class="fa-solid fa-play" style="font-size:16px;"></i>
+        <div style="text-align:left;">
+          <div style="font-weight:600;">Just Start (No Assignment)</div>
+          <div style="font-size:11.5px; opacity:0.8; margin-top:2px;">Move to In Progress without changing assignee</div>
+        </div>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Delete confirmation modal -->
+<div class="modal-backdrop-custom hidden" id="delete-modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h5><i class="fa-solid fa-triangle-exclamation" style="color:var(--error); margin-right:8px;"></i>Delete Ticket</h5>
+      <button class="btn btn-ghost btn-icon" onclick="closeDeleteModal()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-secondary); font-size:13.5px; line-height:1.7;">
+        Are you sure you want to delete <strong style="color:var(--text-primary);">{{ ticket.ticket_number }}</strong>?
+        This action <strong>cannot be undone</strong>.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" id="delete-btn" onclick="deleteTicket()">
+        <i class="fa-solid fa-trash"></i> Delete
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const TICKET_ID = {{ ticket.id }};
+
+// Fix responsive layout
+function fixDetailLayout() {
+  const grid = document.getElementById('detail-grid');
+  if (grid) {
+    grid.style.gridTemplateColumns = window.innerWidth < 900 ? '1fr' : '1fr 310px';
+  }
+}
+window.addEventListener('resize', fixDetailLayout);
+fixDetailLayout();
+
+// ─── Edit Panel ────────────────────────────────────────────
+function toggleEditPanel() {
+  document.getElementById('edit-panel').classList.toggle('hidden');
+}
+
+// ─── Ticket Actions ────────────────────────────────────────
+async function updateTicket() {
+  const status   = document.getElementById('edit-status').value;
+  const priority = document.getElementById('edit-priority').value;
+  const resp = await API.put(`/api/tickets/${TICKET_ID}`, { status, priority });
+  if (resp && resp.ok) {
+    showToast('Ticket updated successfully', 'success');
+    setTimeout(() => location.reload(), 900);
+  } else {
+    showToast('Failed to update ticket', 'error');
+  }
+}
+
+async function assignTicket() {
+  const engineerId = document.getElementById('assign-engineer')?.value || null;
+  const resp = await API.post(`/api/tickets/${TICKET_ID}/assign`, {
+    engineer_id: engineerId ? parseInt(engineerId) : null
+  });
+  if (resp && resp.ok) {
+    showToast('Assignment updated', 'success');
+    setTimeout(() => location.reload(), 900);
+  } else {
+    showToast('Assignment failed', 'error');
+  }
+}
+
+async function quickStatus(status) {
+  const resp = await API.put(`/api/tickets/${TICKET_ID}`, { status });
+  if (resp && resp.ok) {
+    showToast(`Status updated to ${status.replace('_',' ')}`, 'success');
+    setTimeout(() => location.reload(), 700);
+  } else {
+    showToast('Update failed', 'error');
+  }
+}
+
+// ─── Start Working Modal (admin) ───────────────────────────
+function openStartWorkingModal() {
+  document.getElementById('start-working-modal').classList.remove('hidden');
+}
+function closeStartWorkingModal() {
+  document.getElementById('start-working-modal').classList.add('hidden');
+}
+document.getElementById('start-working-modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeStartWorkingModal();
+});
+
+async function startWorkingOption(option) {
+  closeStartWorkingModal();
+  if (option === 'just_start') {
+    await quickStatus('in_progress');
+  } else if (option === 'self_assign') {
+    // Assign to current admin and set in_progress
+    const assignResp = await API.post(`/api/tickets/${TICKET_ID}/assign`, { engineer_id: {{ current_user.id }} });
+    if (assignResp && assignResp.ok) {
+      showToast('Self-assigned & started', 'success');
+      setTimeout(() => location.reload(), 700);
+    } else {
+      showToast('Failed to self-assign', 'error');
+    }
+  } else if (option === 'assign_engineer') {
+    // Open edit panel focused on engineer dropdown
+    openEditPanelFocused();
+  }
+}
+
+function openEditPanelFocused() {
+  const panel = document.getElementById('edit-panel');
+  if (panel) {
+    panel.classList.remove('hidden');
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setTimeout(() => {
+      const engSelect = document.getElementById('assign-engineer');
+      if (engSelect) engSelect.focus();
+    }, 350);
+  }
+}
+
+// ─── Delete ────────────────────────────────────────────────
+function openDeleteModal() { document.getElementById('delete-modal').classList.remove('hidden'); }
+function closeDeleteModal() { document.getElementById('delete-modal').classList.add('hidden'); }
+document.getElementById('delete-modal')?.addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeDeleteModal();
+});
+
+async function deleteTicket() {
+  const btn = document.getElementById('delete-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;margin-right:6px;"></span>Deleting…';
+
+  const resp = await API.delete(`/api/tickets/${TICKET_ID}`);
+  if (resp && resp.ok) {
+    showToast('Ticket deleted', 'success');
+    setTimeout(() => window.location.href = '/tickets', 800);
+  } else {
+    showToast('Delete failed', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-trash"></i> Delete';
+  }
+}
+
+// ─── Comments ──────────────────────────────────────────────
+async function submitComment() {
+  const body = document.getElementById('comment-text').value.trim();
+  if (!body) { showToast('Please write a comment first', 'error'); return; }
+  const isInternal = document.getElementById('is-internal')?.checked || false;
+
+  const btn = document.getElementById('comment-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;"></span>';
+
+  const resp = await API.post(`/api/tickets/${TICKET_ID}/comments`, { body, is_internal: isInternal });
+  if (resp && resp.ok) {
+    showToast('Comment posted', 'success');
+    setTimeout(() => location.reload(), 600);
+  } else {
+    showToast('Failed to post comment', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Post Comment';
+  }
+}
+
+// Ctrl+Enter to submit
+document.getElementById('comment-text')?.addEventListener('keydown', (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+    e.preventDefault();
+    submitComment();
+  }
+});
+
+// ─── File Upload ───────────────────────────────────────────
+async function uploadAttachment(input) {
+  const files = [...input.files];
+  await API.ensureToken();
+  for (const file of files) {
+    if (file.size > 10 * 1024 * 1024) { showToast(`${file.name}: max 10MB`, 'error'); continue; }
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = localStorage.getItem('access_token');
+    try {
+      showToast(`Uploading ${file.name}…`, 'info', 2000);
+      const resp = await fetch(`/api/tickets/${TICKET_ID}/attachments`, {
+        method: 'POST',
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+        credentials: 'include',
+        body: formData
+      });
+      if (resp.ok) {
+        showToast(`${file.name} uploaded`, 'success');
+        setTimeout(() => location.reload(), 1000);
+      } else {
+        showToast(`Failed to upload ${file.name}`, 'error');
+      }
+    } catch(e) { showToast('Upload error', 'error'); }
+  }
+}
+
+// Scroll comments to bottom on load
+const cs = document.getElementById('comments-section');
+if (cs) cs.scrollTop = cs.scrollHeight;
+</script>
+{% endblock %}

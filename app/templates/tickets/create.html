@@ -1,0 +1,482 @@
+{% extends 'base.html' %}
+{% block title %}New Ticket — HelpDesk Pro{% endblock %}
+{% block page_title %}New Ticket{% endblock %}
+{% block page_subtitle %}Submit a new support request{% endblock %}
+
+{% block content %}
+<div style="max-width:760px; margin:0 auto;">
+
+  <!-- Steps Progress Bar -->
+  <div class="card" style="padding:24px; margin-bottom:20px;">
+    <div class="steps-bar" id="steps-bar" role="list">
+      <div class="step-item active" id="step-item-1" role="listitem">
+        <div class="step-circle" aria-label="Step 1: Basic Information">1</div>
+        <div class="step-label">Basic Info</div>
+      </div>
+      <div class="step-item" id="step-item-2" role="listitem">
+        <div class="step-circle" aria-label="Step 2: Issue Details">2</div>
+        <div class="step-label">Issue Details</div>
+      </div>
+      <div class="step-item" id="step-item-3" role="listitem">
+        <div class="step-circle" aria-label="Step 3: Attachments">3</div>
+        <div class="step-label">Attachments</div>
+      </div>
+      <div class="step-item" id="step-item-4" role="listitem">
+        <div class="step-circle" aria-label="Step 4: Review & Submit">4</div>
+        <div class="step-label">Review</div>
+      </div>
+    </div>
+
+    <!-- Progress bar -->
+    <div class="progress-bar" style="margin-top:16px;">
+      <div class="progress-fill" id="progress-fill" style="width:25%;"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title" id="step-title">
+        <i class="fa-solid fa-circle-info" style="color:var(--brand-glow);"></i>
+        <span id="step-title-text">Basic Information</span>
+      </span>
+      <a href="{{ url_for('web.tickets') }}" class="btn btn-secondary btn-sm">
+        <i class="fa-solid fa-arrow-left"></i> Back
+      </a>
+    </div>
+
+    <div class="card-body">
+
+      <!-- ─── Step 1: Basic Info ──────────────────────────── -->
+      <div class="step-panel active" id="panel-1">
+        <div class="form-group">
+          <label class="form-label" for="title">
+            Subject / Title <span class="required">*</span>
+          </label>
+          <input type="text" class="form-control" id="title"
+                 placeholder="Brief summary of the issue (e.g., Cannot access VPN)"
+                 maxlength="200" required>
+          <div class="char-counter"><span id="title-count">0</span>/200</div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label" for="category">
+              Category <span class="required">*</span>
+            </label>
+            <select class="form-select" id="category">
+              {% for c in categories %}
+              <option value="{{ c }}">{{ c }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="priority">
+              Priority <span class="required">*</span>
+            </label>
+            <select class="form-select" id="priority">
+              {% for p in priorities %}
+              <option value="{{ p }}" {% if p == 'medium' %}selected{% endif %}>{{ p.title() }}</option>
+              {% endfor %}
+            </select>
+          </div>
+        </div>
+
+        <!-- Priority guide -->
+        <div style="padding:14px; background:var(--bg-deep); border:1px solid var(--border-md); border-radius:var(--radius-sm);">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:10px;">
+            Priority Guide
+          </div>
+          <div style="display:grid; gap:6px; font-size:12px;">
+            <div style="display:flex; align-items:center; gap:8px;"><span class="badge-priority badge-low">low</span> Minor inconvenience, workaround available</div>
+            <div style="display:flex; align-items:center; gap:8px;"><span class="badge-priority badge-medium">medium</span> Affecting work but not blocking</div>
+            <div style="display:flex; align-items:center; gap:8px;"><span class="badge-priority badge-high">high</span> Significant impact, needs urgent attention</div>
+            <div style="display:flex; align-items:center; gap:8px;"><span class="badge-priority badge-critical">critical</span> System down, blocking business operations</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Step 2: Issue Details ──────────────────────── -->
+      <div class="step-panel" id="panel-2">
+        <div class="form-group">
+          <label class="form-label" for="description">
+            Description <span class="required">*</span>
+          </label>
+          <textarea class="form-control" id="description" rows="7"
+                    placeholder="Describe the issue in detail. Include:&#10;• Steps to reproduce&#10;• Error messages&#10;• Impact on your work&#10;• Any workarounds you've tried"
+                    required></textarea>
+          <div class="form-hint">The more detail you provide, the faster we can resolve your issue.</div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label" for="due-date">Due Date (optional)</label>
+            <input type="datetime-local" class="form-control" id="due-date">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="tags">Sub-Category (optional)</label>
+            <input type="text" class="form-control" id="tags"
+                   placeholder="e.g., VPN Issue, Printer, Outlook, SAP">
+            <div class="form-hint">Enter sub-category or keywords — anything works (comma-separated for multiple).</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Step 3: Attachments ────────────────────────── -->
+      <div class="step-panel" id="panel-3">
+        <div class="form-group">
+          <label class="form-label">Attachments (optional)</label>
+          <div class="file-drop-zone" id="drop-zone"
+               onclick="document.getElementById('file-input').click()"
+               role="button" tabindex="0" aria-label="Upload files"
+               onkeydown="if(event.key==='Enter' || event.key===' ') document.getElementById('file-input').click()">
+            <div class="drop-icon" aria-hidden="true"><i class="fa-solid fa-cloud-arrow-up"></i></div>
+            <div class="drop-title">Drop files here or click to upload</div>
+            <div class="drop-sub">PNG, JPG, PDF, DOC, XLSX, ZIP — max 10MB each</div>
+          </div>
+          <input type="file" id="file-input" multiple hidden
+                 accept=".png,.jpg,.jpeg,.gif,.pdf,.doc,.docx,.xls,.xlsx,.txt,.zip">
+          <div id="file-list" style="margin-top:10px;"></div>
+        </div>
+
+        <div style="padding:14px; background:var(--bg-deep); border:1px solid var(--border-md); border-radius:var(--radius-sm);">
+          <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:var(--text-muted); margin-bottom:8px;">
+            Tips for Screenshots
+          </div>
+          <ul style="font-size:12.5px; color:var(--text-secondary); line-height:1.8; padding-left:16px;">
+            <li>Include screenshots of error messages</li>
+            <li>Annotate important areas if needed</li>
+            <li>Log files help diagnose technical issues</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- ─── Step 4: Review ─────────────────────────────── -->
+      <div class="step-panel" id="panel-4">
+        <div style="margin-bottom:16px; padding:14px; background:rgba(37,99,235,0.05); border:1px solid rgba(37,99,235,0.15); border-radius:var(--radius-sm);">
+          <div style="font-size:13px; font-weight:700; color:var(--brand-glow); margin-bottom:12px;">
+            <i class="fa-solid fa-clipboard-check" style="margin-right:6px;"></i>
+            Review Before Submitting
+          </div>
+          <div style="display:grid; gap:10px; font-size:13px;">
+            <div style="display:flex; gap:10px;">
+              <span style="color:var(--text-muted); min-width:100px; font-weight:500;">Subject</span>
+              <strong id="review-title" style="color:var(--text-primary); word-break:break-word;"></strong>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <span style="color:var(--text-muted); min-width:100px; font-weight:500;">Category</span>
+              <span id="review-category"></span>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <span style="color:var(--text-muted); min-width:100px; font-weight:500;">Priority</span>
+              <span id="review-priority"></span>
+            </div>
+            <div style="display:flex; gap:10px;">
+              <span style="color:var(--text-muted); min-width:100px; font-weight:500;">Description</span>
+              <span id="review-description" style="word-break:break-word; color:var(--text-secondary); max-height:80px; overflow:hidden; text-overflow:ellipsis;"></span>
+            </div>
+            <div style="display:flex; gap:10px;" id="review-tags-row" class="hidden">
+              <span style="color:var(--text-muted); min-width:100px; font-weight:500;">Sub-Category</span>
+              <span id="review-tags"></span>
+            </div>
+            <div style="display:flex; gap:10px;" id="review-due-row" class="hidden">
+              <span style="color:var(--text-muted); min-width:100px; font-weight:500;">Due Date</span>
+              <span id="review-due" style="color:var(--warning);"></span>
+            </div>
+            <div style="display:flex; gap:10px;" id="review-files-row" class="hidden">
+              <span style="color:var(--text-muted); min-width:100px; font-weight:500;">Attachments</span>
+              <span id="review-files"></span>
+            </div>
+          </div>
+        </div>
+
+        <div style="padding:12px 14px; background:rgba(34,197,94,0.06); border:1px solid rgba(34,197,94,0.2); border-radius:var(--radius-sm); font-size:12.5px; color:#4ade80;">
+          <i class="fa-solid fa-circle-check" style="margin-right:6px;"></i>
+          You'll receive an email confirmation once your ticket is submitted. Our team typically responds within 24 hours.
+        </div>
+      </div>
+
+      <!-- ─── Navigation Buttons ─────────────────────────── -->
+      <div style="display:flex; justify-content:space-between; align-items:center; padding-top:20px; border-top:1px solid var(--border); margin-top:20px;">
+        <button class="btn btn-secondary" id="btn-prev" onclick="prevStep()" style="visibility:hidden;">
+          <i class="fa-solid fa-arrow-left"></i> Previous
+        </button>
+        <div style="display:flex; gap:8px;">
+          <a href="{{ url_for('web.tickets') }}" class="btn btn-ghost">Cancel</a>
+          <button class="btn btn-primary" id="btn-next" onclick="nextStep()">
+            Next <i class="fa-solid fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentStep = 1;
+const totalSteps = 4;
+let pendingFiles = [];
+
+const stepTitles = {
+  1: ['fa-circle-info', 'Basic Information'],
+  2: ['fa-file-lines', 'Issue Details'],
+  3: ['fa-paperclip', 'Attachments'],
+  4: ['fa-clipboard-check', 'Review & Submit'],
+};
+
+// ─── Step Navigation ───────────────────────────────────────
+function goToStep(step) {
+  if (step < 1 || step > totalSteps) return;
+
+  // Mark old step
+  const oldItem = document.getElementById(`step-item-${currentStep}`);
+  if (currentStep < step) oldItem?.classList.add('done');
+
+  // Update panels
+  document.getElementById(`panel-${currentStep}`)?.classList.remove('active');
+  currentStep = step;
+  document.getElementById(`panel-${step}`)?.classList.add('active');
+
+  // Update step indicators
+  for (let i = 1; i <= totalSteps; i++) {
+    const item = document.getElementById(`step-item-${i}`);
+    if (!item) continue;
+    item.classList.remove('active');
+    if (i < step) item.classList.add('done');
+    else if (i === step) { item.classList.add('active'); item.classList.remove('done'); }
+    else item.classList.remove('done');
+  }
+
+  // Update title
+  const [icon, title] = stepTitles[step];
+  document.querySelector('#step-title i').className = `fa-solid ${icon}`;
+  document.querySelector('#step-title-text').textContent = title;
+
+  // Update progress
+  document.getElementById('progress-fill').style.width = `${(step / totalSteps) * 100}%`;
+
+  // Button visibility
+  document.getElementById('btn-prev').style.visibility = step > 1 ? 'visible' : 'hidden';
+  const nextBtn = document.getElementById('btn-next');
+  if (step === totalSteps) {
+    nextBtn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Ticket';
+    nextBtn.className = 'btn btn-success';
+    populateReview();
+  } else {
+    nextBtn.innerHTML = 'Next <i class="fa-solid fa-arrow-right"></i>';
+    nextBtn.className = 'btn btn-primary';
+  }
+
+  // Scroll to top
+  document.querySelector('.card')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function prevStep() { goToStep(currentStep - 1); }
+
+function nextStep() {
+  if (currentStep === totalSteps) {
+    submitTicket();
+    return;
+  }
+  if (!validateStep(currentStep)) return;
+  goToStep(currentStep + 1);
+}
+
+// ─── Validation ────────────────────────────────────────────
+function validateStep(step) {
+  if (step === 1) {
+    const title = document.getElementById('title').value.trim();
+    if (!title) {
+      showToast('Please enter a ticket subject', 'error');
+      document.getElementById('title').focus();
+      return false;
+    }
+    if (title.length < 5) {
+      showToast('Subject must be at least 5 characters', 'error');
+      return false;
+    }
+  }
+  if (step === 2) {
+    const desc = document.getElementById('description').value.trim();
+    if (!desc) {
+      showToast('Please describe the issue', 'error');
+      document.getElementById('description').focus();
+      return false;
+    }
+    if (desc.length < 10) {
+      showToast('Description must be at least 10 characters', 'error');
+      return false;
+    }
+  }
+  return true;
+}
+
+// ─── Review Panel ──────────────────────────────────────────
+function populateReview() {
+  const title    = document.getElementById('title').value.trim();
+  const category = document.getElementById('category').value;
+  const priority = document.getElementById('priority').value;
+  const desc     = document.getElementById('description').value.trim();
+  const tags     = document.getElementById('tags').value.trim();
+  const dueDate  = document.getElementById('due-date').value;
+
+  document.getElementById('review-title').textContent    = title;
+  document.getElementById('review-category').textContent = category;
+  document.getElementById('review-description').textContent = desc;
+
+  const prEl = document.getElementById('review-priority');
+  prEl.innerHTML = `<span class="badge-priority badge-${priority}">${priority}</span>`;
+
+  if (tags) {
+    document.getElementById('review-tags-row').classList.remove('hidden');
+    document.getElementById('review-tags').innerHTML = tags.split(',')
+      .map(t => `<span class="tag-chip" style="margin-right:4px;">${escapeHtml(t.trim())}</span>`).join('');
+  }
+
+  if (dueDate) {
+    document.getElementById('review-due-row').classList.remove('hidden');
+    document.getElementById('review-due').textContent = new Date(dueDate).toLocaleString();
+  }
+
+  if (pendingFiles.length) {
+    document.getElementById('review-files-row').classList.remove('hidden');
+    document.getElementById('review-files').textContent = `${pendingFiles.length} file${pendingFiles.length !== 1 ? 's' : ''} (${pendingFiles.map(f => f.name).join(', ')})`;
+  }
+}
+
+// ─── File Handling ─────────────────────────────────────────
+const dropZone = document.getElementById('drop-zone');
+
+dropZone.addEventListener('dragover', (e) => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', (e) => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  handleFiles([...e.dataTransfer.files]);
+});
+
+document.getElementById('file-input').addEventListener('change', (e) => handleFiles([...e.target.files]));
+
+function handleFiles(files) {
+  files.forEach(f => {
+    if (f.size > 10 * 1024 * 1024) { showToast(`${f.name} exceeds 10MB`, 'error'); return; }
+    if (!pendingFiles.find(p => p.name === f.name && p.size === f.size)) {
+      pendingFiles.push(f);
+    }
+  });
+  renderFileList();
+}
+
+function renderFileList() {
+  const list = document.getElementById('file-list');
+  if (!pendingFiles.length) { list.innerHTML = ''; return; }
+  list.innerHTML = pendingFiles.map((f, i) => `
+    <div class="file-item">
+      <div style="width:30px;height:30px;border-radius:6px;background:var(--brand-subtle);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+        <i class="fa-solid fa-file" style="font-size:13px;color:var(--brand-glow);"></i>
+      </div>
+      <div class="file-name">${escapeHtml(f.name)}</div>
+      <div class="file-size">${formatFileSize(f.size)}</div>
+      <button onclick="removeFile(${i})" class="btn btn-ghost btn-icon" style="color:var(--error);" aria-label="Remove ${escapeHtml(f.name)}">
+        <i class="fa-solid fa-xmark" style="font-size:12px;"></i>
+      </button>
+    </div>`).join('');
+}
+
+function removeFile(i) { pendingFiles.splice(i, 1); renderFileList(); }
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
+}
+
+// ─── Submit ────────────────────────────────────────────────
+async function submitTicket() {
+  const title       = document.getElementById('title').value.trim();
+  const description = document.getElementById('description').value.trim();
+  const category    = document.getElementById('category').value;
+  const priority    = document.getElementById('priority').value;
+  const tags        = document.getElementById('tags').value.trim() || null;
+  const dueDate     = document.getElementById('due-date').value;
+
+  const btn = document.getElementById('btn-next');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:16px;height:16px;"></span> Submitting…';
+
+  try {
+    const resp = await API.post('/api/tickets', {
+      title, description, category, priority,
+      tags,
+      due_date: dueDate ? new Date(dueDate).toISOString() : null,
+    });
+
+    if (!resp || !resp.ok) {
+      const d = await resp?.json();
+      showToast(d?.error || 'Failed to create ticket', 'error');
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Ticket';
+      return;
+    }
+
+    const { data } = await resp.json();
+    const ticketId = data.id;
+
+    // Upload attachments
+    if (pendingFiles.length) {
+      showToast('Uploading attachments…', 'info', 3000);
+      await API.ensureToken();
+      for (const file of pendingFiles) {
+        const formData = new FormData();
+        formData.append('file', file);
+        const token = localStorage.getItem('access_token');
+        try {
+          await fetch(`/api/tickets/${ticketId}/attachments`, {
+            method: 'POST',
+            headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+            credentials: 'include',
+            body: formData
+          });
+        } catch(fe) { console.error('Upload error:', fe); }
+      }
+    }
+
+    showToast(`Ticket ${data.ticket_number} created!`, 'success', 2500);
+    setTimeout(() => window.location.href = `/tickets/${ticketId}`, 1500);
+
+  } catch(err) {
+    showToast('Error creating ticket. Please try again.', 'error');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Submit Ticket';
+  }
+}
+
+// ─── Event listeners ───────────────────────────────────────
+document.getElementById('title').addEventListener('input', (e) => {
+  document.getElementById('title-count').textContent = e.target.value.length;
+});
+
+// Auto-save to sessionStorage
+const autoSaveFields = ['title', 'description', 'category', 'priority', 'tags'];
+autoSaveFields.forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  // Restore saved value
+  const saved = sessionStorage.getItem(`ticket-draft-${id}`);
+  if (saved) el.value = saved;
+
+  el.addEventListener('input', () => {
+    sessionStorage.setItem(`ticket-draft-${id}`, el.value);
+  });
+});
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

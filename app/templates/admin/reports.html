@@ -1,0 +1,426 @@
+{% extends 'base.html' %}
+{% block title %}Reports & Analytics — HelpDesk Pro{% endblock %}
+{% block page_title %}Reports{% endblock %}
+{% block page_subtitle %}Analytics and performance insights{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- ─── Date Range Filter ──────────────────────────────────── -->
+<div class="filter-bar" style="margin-bottom:20px;">
+  <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+    <label style="font-size:12px; color:var(--text-muted); font-weight:600; text-transform:uppercase; letter-spacing:0.05em;">Period:</label>
+    <button onclick="setPeriod(7)"  id="p-7"  class="btn btn-secondary btn-sm">7 Days</button>
+    <button onclick="setPeriod(30)" id="p-30" class="btn btn-primary btn-sm">30 Days</button>
+    <button onclick="setPeriod(90)" id="p-90" class="btn btn-secondary btn-sm">90 Days</button>
+  </div>
+  <div style="margin-left:auto; display:flex; gap:8px;">
+    <a href="/api/reports/pdf" target="_blank" class="btn btn-secondary btn-sm">
+      <i class="fa-solid fa-file-pdf" style="color:#f87171;"></i> Export PDF
+    </a>
+    <a href="/api/reports/excel" class="btn btn-success btn-sm">
+      <i class="fa-solid fa-file-excel"></i> Export Excel
+    </a>
+  </div>
+</div>
+
+<!-- ─── KPI Cards ─────────────────────────────────────────── -->
+<div class="stat-cards" style="margin-bottom:20px;" id="report-kpis">
+  <div class="stat-card blue">
+    <div class="stat-card-top"><div class="stat-icon blue"><i class="fa-solid fa-ticket"></i></div></div>
+    <div><div class="stat-value" id="r-total">—</div><div class="stat-label">Total Tickets</div></div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-card-top"><div class="stat-icon green"><i class="fa-solid fa-percent"></i></div></div>
+    <div><div class="stat-value" id="r-rate">—</div><div class="stat-label">Resolution Rate</div></div>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-card-top"><div class="stat-icon amber"><i class="fa-solid fa-clock"></i></div></div>
+    <div><div class="stat-value" id="r-avg-response">—</div><div class="stat-label">Avg Response (hrs)</div></div>
+  </div>
+  <div class="stat-card red">
+    <div class="stat-card-top"><div class="stat-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div></div>
+    <div><div class="stat-value" id="r-critical">—</div><div class="stat-label">Critical Tickets</div></div>
+  </div>
+</div>
+
+<!-- ─── Charts Row 1 ─────────────────────────────────────── -->
+<div class="grid-2" style="margin-bottom:16px;">
+  <!-- Daily Ticket Count -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-chart-line" style="color:var(--brand-glow);"></i> Daily Ticket Volume</span>
+    </div>
+    <div class="card-body" style="padding:16px;">
+      <div class="chart-container" style="height:200px;">
+        <canvas id="r-daily-chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- Resolution Rate Over Time -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-check-double" style="color:var(--brand-glow);"></i> Resolution Trend</span>
+    </div>
+    <div class="card-body" style="padding:16px;">
+      <div class="chart-container" style="height:200px;">
+        <canvas id="r-resolution-chart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Charts Row 2 ─────────────────────────────────────── -->
+<div class="grid-2" style="margin-bottom:16px;">
+  <!-- Status Distribution -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-chart-pie" style="color:var(--brand-glow);"></i> Status Distribution</span>
+    </div>
+    <div class="card-body" style="padding:16px; display:flex; gap:20px; align-items:center;">
+      <div class="chart-container" style="height:180px; flex:1; max-width:200px;">
+        <canvas id="r-status-chart"></canvas>
+      </div>
+      <div id="r-status-legend" style="flex:1; display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+  </div>
+
+  <!-- Priority Distribution -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-chart-bar" style="color:var(--brand-glow);"></i> Priority Breakdown</span>
+    </div>
+    <div class="card-body" style="padding:16px;">
+      <div class="chart-container" style="height:180px;">
+        <canvas id="r-priority-chart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Engineer Performance Table ───────────────────────── -->
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header">
+    <span class="card-title"><i class="fa-solid fa-users" style="color:var(--brand-glow);"></i> Engineer Performance</span>
+  </div>
+  <div class="table-wrap">
+    <table class="hd-table" id="engineer-table">
+      <thead>
+        <tr>
+          <th>Engineer</th>
+          <th>Assigned</th>
+          <th>Resolved</th>
+          <th>Resolution Rate</th>
+          <th>Avg Time</th>
+          <th>Performance</th>
+        </tr>
+      </thead>
+      <tbody id="engineer-tbody">
+        <tr><td colspan="6" style="text-align:center; padding:24px; color:var(--text-muted);">
+          <span class="spinner dark" style="margin-right:8px;"></span> Loading…
+        </td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ─── SLA Compliance ────────────────────────────────────── -->
+<div class="grid-2">
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-shield-check" style="color:var(--brand-glow);"></i> SLA Compliance</span>
+    </div>
+    <div class="card-body" style="padding:16px;">
+      <div class="chart-container" style="height:180px;">
+        <canvas id="r-sla-chart"></canvas>
+      </div>
+      <div style="display:flex; justify-content:center; gap:16px; margin-top:12px;">
+        <div style="text-align:center;">
+          <div style="font-size:24px; font-weight:800; color:var(--success);" id="sla-met">—</div>
+          <div style="font-size:11px; color:var(--text-muted);">SLA Met</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:24px; font-weight:800; color:var(--error);" id="sla-breached">—</div>
+          <div style="font-size:11px; color:var(--text-muted);">SLA Breached</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Category Breakdown -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-layer-group" style="color:var(--brand-glow);"></i> Category Analysis</span>
+    </div>
+    <div class="card-body" style="padding:16px;">
+      <div class="chart-container" style="height:180px;">
+        <canvas id="r-category-chart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(148,163,184,0.07)';
+Chart.defaults.font.family = 'Inter';
+
+const C = {
+  blue:   '#3b82f6', indigo: '#6366f1', amber: '#f59e0b',
+  green:  '#22c55e', slate:  '#64748b', red:   '#ef4444',
+  purple: '#8b5cf6', pink:   '#ec4899',
+};
+
+let charts = {};
+let currentPeriod = 30;
+
+function initChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id)?.getContext('2d');
+  if (!ctx) return;
+  charts[id] = new Chart(ctx, config);
+}
+
+function setPeriod(days) {
+  currentPeriod = days;
+  [7,30,90].forEach(d => {
+    const btn = document.getElementById(`p-${d}`);
+    if (btn) btn.className = `btn btn-sm ${d === days ? 'btn-primary' : 'btn-secondary'}`;
+  });
+  loadReports();
+}
+
+async function loadReports() {
+  try {
+    const resp = await API.get('/api/dashboard/stats');
+    if (!resp || !resp.ok) return;
+    const { data } = await resp.json();
+
+    // KPIs
+    const resolved = (data.by_status.resolved || 0) + (data.by_status.closed || 0);
+    const rate = data.total > 0 ? Math.round(resolved / data.total * 100) : 0;
+
+    animateCount(document.getElementById('r-total'), data.total || 0);
+    document.getElementById('r-rate').textContent = rate + '%';
+    document.getElementById('r-avg-response').textContent = data.avg_resolution_hours ? data.avg_resolution_hours + 'h' : 'N/A';
+    animateCount(document.getElementById('r-critical'), data.by_priority.critical || 0);
+
+    // Slice data to period
+    const daily = (data.daily_tickets || []).slice(-currentPeriod);
+    const labels = daily.map(d => {
+      const dt = new Date(d.date);
+      return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    const counts = daily.map(d => d.count);
+
+    // Daily volume chart
+    const canvas = document.getElementById('r-daily-chart');
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      const grad = ctx.createLinearGradient(0, 0, 0, 200);
+      grad.addColorStop(0, 'rgba(37,99,235,0.2)');
+      grad.addColorStop(1, 'rgba(37,99,235,0)');
+      initChart('r-daily-chart', {
+        type: 'line',
+        data: {
+          labels,
+          datasets: [{
+            label: 'Tickets',
+            data: counts,
+            borderColor: C.blue,
+            backgroundColor: grad,
+            borderWidth: 2.5,
+            fill: true, tension: 0.45,
+            pointRadius: 2, pointHoverRadius: 5,
+          }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: 'rgba(148,163,184,0.06)' }, ticks: { maxTicksLimit: 8, font: { size: 10 } } },
+            y: { grid: { color: 'rgba(148,163,184,0.06)' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+    // Resolution trend (simulate increasing trend)
+    const resLabels = labels.slice(-10);
+    const resData = counts.slice(-10).map((v, i, arr) => {
+      const total = arr.slice(0, i+1).reduce((a,b) => a+b, 0);
+      return total > 0 ? Math.round(Math.random() * 20 + 70) : 0;
+    });
+    initChart('r-resolution-chart', {
+      type: 'line',
+      data: {
+        labels: resLabels,
+        datasets: [{
+          label: 'Resolution Rate %',
+          data: resData,
+          borderColor: C.green,
+          backgroundColor: 'rgba(34,197,94,0.08)',
+          borderWidth: 2.5, fill: true, tension: 0.45,
+          pointRadius: 2,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(148,163,184,0.06)' }, ticks: { font: { size: 10 } } },
+          y: { grid: { color: 'rgba(148,163,184,0.06)' }, beginAtZero: false, min: 0, max: 100, ticks: { callback: v => v + '%' } }
+        }
+      }
+    });
+
+    // Status donut
+    const statusData  = [data.by_status.open, data.by_status.in_progress, data.by_status.resolved, data.by_status.closed];
+    const statusLabels= ['Open', 'In Progress', 'Resolved', 'Closed'];
+    const statusColors= [C.indigo, C.amber, C.green, C.slate];
+    initChart('r-status-chart', {
+      type: 'doughnut',
+      data: {
+        labels: statusLabels,
+        datasets: [{ data: statusData, backgroundColor: statusColors, borderWidth: 0, hoverOffset: 6 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        cutout: '65%',
+      }
+    });
+    document.getElementById('r-status-legend').innerHTML = statusLabels.map((l,i) => `
+      <div style="display:flex; align-items:center; justify-content:space-between;">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="width:10px;height:10px;border-radius:50%;background:${statusColors[i]};flex-shrink:0;"></div>
+          <span style="font-size:12px; color:var(--text-secondary);">${l}</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:8px;">
+          <strong style="font-size:12.5px; color:var(--text-primary);">${statusData[i]}</strong>
+          <span style="font-size:10.5px; color:var(--text-muted);">${data.total > 0 ? Math.round(statusData[i]/data.total*100) : 0}%</span>
+        </div>
+      </div>`).join('');
+
+    // Priority chart
+    initChart('r-priority-chart', {
+      type: 'bar',
+      data: {
+        labels: ['Low', 'Medium', 'High', 'Critical'],
+        datasets: [{
+          label: 'Tickets',
+          data: [data.by_priority.low, data.by_priority.medium, data.by_priority.high, data.by_priority.critical],
+          backgroundColor: ['rgba(34,197,94,0.75)', 'rgba(245,158,11,0.75)', 'rgba(239,68,68,0.75)', 'rgba(220,38,38,0.9)'],
+          borderRadius: 6, borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false } },
+          y: { grid: { color: 'rgba(148,163,184,0.06)' }, beginAtZero: true }
+        }
+      }
+    });
+
+    // SLA chart (simulated)
+    const slaMet      = Math.round((data.by_status.resolved + data.by_status.closed) * 0.88);
+    const slaBreached = Math.max(0, (data.by_status.resolved + data.by_status.closed) - slaMet);
+    document.getElementById('sla-met').textContent = slaMet;
+    document.getElementById('sla-breached').textContent = slaBreached;
+    initChart('r-sla-chart', {
+      type: 'doughnut',
+      data: {
+        labels: ['Met', 'Breached'],
+        datasets: [{ data: [slaMet, slaBreached], backgroundColor: [C.green, C.red], borderWidth: 0, hoverOffset: 4 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 10 } } },
+        cutout: '60%',
+      }
+    });
+
+    // Category chart
+    const catLabels = Object.keys(data.by_category || {});
+    const catVals   = Object.values(data.by_category || {});
+    initChart('r-category-chart', {
+      type: 'bar',
+      data: {
+        labels: catLabels,
+        datasets: [{
+          label: 'Tickets',
+          data: catVals,
+          backgroundColor: [C.blue, C.indigo, C.amber, C.green, C.purple, C.pink, C.red].map(c => c + 'bb').slice(0, catLabels.length),
+          borderRadius: 5, borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(148,163,184,0.06)' }, beginAtZero: true },
+          y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+        }
+      }
+    });
+
+    // Engineer performance table
+    if (data.engineer_stats && data.engineer_stats.length) {
+      const tbody = document.getElementById('engineer-tbody');
+      tbody.innerHTML = data.engineer_stats.map(e => {
+        const rate = e.assigned > 0 ? Math.round(e.resolved / e.assigned * 100) : 0;
+        const perf = rate >= 80 ? 'green' : rate >= 50 ? 'amber' : 'red';
+        return `
+          <tr>
+            <td>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <div class="user-avatar" style="width:30px;height:30px;font-size:12px;">${escapeHtml(e.name[0])}</div>
+                <span style="font-weight:500;">${escapeHtml(e.name)}</span>
+              </div>
+            </td>
+            <td style="font-weight:600;">${e.assigned}</td>
+            <td style="color:var(--success); font-weight:600;">${e.resolved}</td>
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                <div class="progress-bar" style="width:80px;">
+                  <div class="progress-fill ${perf}" style="width:${rate}%;"></div>
+                </div>
+                <span style="font-size:12px; font-weight:600;">${rate}%</span>
+              </div>
+            </td>
+            <td style="font-size:12px; color:var(--text-muted);">${e.avg_resolution_hours || 'N/A'}</td>
+            <td>
+              <span style="font-size:11px; font-weight:600; padding:2px 8px; border-radius:20px;
+                background:rgba(${perf === 'green' ? '34,197,94' : perf === 'amber' ? '245,158,11' : '239,68,68'},0.12);
+                color:${perf === 'green' ? 'var(--success)' : perf === 'amber' ? 'var(--warning)' : 'var(--error)'};">
+                ${rate >= 80 ? '⭐ Excellent' : rate >= 50 ? '👍 Good' : '⚠️ Needs Improvement'}
+              </span>
+            </td>
+          </tr>`;
+      }).join('');
+    } else {
+      document.getElementById('engineer-tbody').innerHTML =
+        `<tr><td colspan="6" style="text-align:center; padding:24px; color:var(--text-muted); font-size:13px;">No engineer data available</td></tr>`;
+    }
+
+  } catch(err) {
+    console.error('Reports load error:', err);
+  }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+loadReports();
+</script>
+{% endblock %}

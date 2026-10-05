@@ -1,0 +1,330 @@
+{% extends 'base.html' %}
+{% block title %}Profile — HelpDesk Pro{% endblock %}
+{% block page_title %}My Profile{% endblock %}
+{% block page_subtitle %}Manage your account settings and preferences{% endblock %}
+
+{% block content %}
+<div style="max-width:900px;">
+
+  <!-- Profile Banner + Avatar -->
+  <div class="card" style="margin-bottom:20px; overflow:hidden;">
+    <div class="profile-banner">
+      <div class="profile-avatar-wrap">
+        <div class="profile-avatar" aria-hidden="true">{{ current_user.name[0].upper() }}</div>
+      </div>
+    </div>
+    <div style="padding:52px 24px 24px; display:flex; align-items:flex-end; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+      <div>
+        <h2 style="font-size:20px; font-weight:800; color:var(--text-primary); margin-bottom:4px;">{{ current_user.name }}</h2>
+        <div style="font-size:13px; color:var(--text-muted); margin-bottom:8px;">{{ current_user.email }}</div>
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+          <span class="badge-role {{ current_user.role }}">{{ current_user.role }}</span>
+          {% if current_user.department %}
+          <span style="font-size:12px; color:var(--text-muted);">
+            <i class="fa-solid fa-building" style="margin-right:4px;"></i>{{ current_user.department }}
+          </span>
+          {% endif %}
+          <span style="font-size:12px; color:var(--text-muted);">
+            <i class="fa-solid fa-calendar" style="margin-right:4px;"></i>Joined {{ current_user.created_at.strftime('%B %Y') }}
+          </span>
+        </div>
+      </div>
+      <div style="display:flex; gap:24px; text-align:center;">
+        <div>
+          <div style="font-size:24px; font-weight:800; color:var(--text-primary);" id="stat-raised">—</div>
+          <div style="font-size:11px; color:var(--text-muted);">Tickets Raised</div>
+        </div>
+        {% if current_user.role in ('admin', 'engineer') %}
+        <div>
+          <div style="font-size:24px; font-weight:800; color:var(--text-primary);" id="stat-assigned">—</div>
+          <div style="font-size:11px; color:var(--text-muted);">Assigned</div>
+        </div>
+        <div>
+          <div style="font-size:24px; font-weight:800; color:var(--success);" id="stat-resolved">—</div>
+          <div style="font-size:11px; color:var(--text-muted);">Resolved</div>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px;" id="profile-grid">
+
+    <!-- Edit Profile -->
+    <div class="card">
+      <div class="card-header">
+        <span class="card-title"><i class="fa-solid fa-user-pen" style="color:var(--brand-glow);"></i> Edit Profile</span>
+      </div>
+      <div class="card-body">
+        <form id="profile-form" novalidate>
+          <div class="form-group">
+            <label class="form-label" for="p-name">Full Name</label>
+            <input type="text" class="form-control" id="p-name"
+                   value="{{ current_user.name }}" placeholder="Your full name">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="p-email">Email Address</label>
+            <input type="email" class="form-control" id="p-email"
+                   value="{{ current_user.email }}" disabled
+                   style="opacity:0.6; cursor:not-allowed;"
+                   title="Email cannot be changed">
+            <div class="form-hint">Contact admin to change email address.</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="p-dept">Department</label>
+            <input type="text" class="form-control" id="p-dept"
+                   value="{{ current_user.department or '' }}"
+                   placeholder="e.g. IT, HR, Finance, Engineering">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="p-phone">Phone Number</label>
+            <div class="input-icon-wrap">
+              <i class="input-icon fa-solid fa-phone" aria-hidden="true"></i>
+              <input type="tel" class="form-control" id="p-phone"
+                     value="{{ current_user.phone or '' }}"
+                     placeholder="+1-555-0100">
+            </div>
+          </div>
+          <button type="submit" class="btn btn-primary" id="save-profile-btn">
+            <i class="fa-solid fa-floppy-disk"></i> Save Profile
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Change Password -->
+    <div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-lock" style="color:var(--brand-glow);"></i> Change Password</span>
+        </div>
+        <div class="card-body">
+          <form id="password-form" novalidate>
+            <div class="form-group">
+              <label class="form-label" for="current-pwd">Current Password</label>
+              <div class="input-icon-wrap" style="position:relative;">
+                <i class="input-icon fa-solid fa-lock" aria-hidden="true"></i>
+                <input type="password" class="form-control" id="current-pwd"
+                       placeholder="Enter current password" autocomplete="current-password">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="new-pwd">New Password</label>
+              <input type="password" class="form-control" id="new-pwd"
+                     placeholder="Min 8 characters" autocomplete="new-password">
+              <!-- Password strength -->
+              <div id="pwd-strength" style="margin-top:6px; display:none;">
+                <div class="progress-bar" style="margin-bottom:4px;">
+                  <div class="progress-fill" id="pwd-strength-bar" style="width:0%;"></div>
+                </div>
+                <div id="pwd-strength-label" style="font-size:11px; color:var(--text-muted);"></div>
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label" for="confirm-pwd">Confirm New Password</label>
+              <input type="password" class="form-control" id="confirm-pwd"
+                     placeholder="Re-enter new password" autocomplete="new-password">
+            </div>
+            <button type="submit" class="btn btn-primary">
+              <i class="fa-solid fa-key"></i> Change Password
+            </button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Notification Preferences -->
+      <div class="card">
+        <div class="card-header">
+          <span class="card-title"><i class="fa-solid fa-bell" style="color:var(--brand-glow);"></i> Notifications</span>
+        </div>
+        <div class="card-body" style="padding:14px 20px;">
+          <div style="display:flex; flex-direction:column; gap:14px;">
+            {% for label, key, checked in [
+              ('Ticket Assigned to Me', 'notif_assigned', True),
+              ('New Comment on My Ticket', 'notif_comment', True),
+              ('Ticket Status Updated', 'notif_status', True),
+              ('SLA Warning', 'notif_sla', True),
+              ('Weekly Summary', 'notif_weekly', False),
+            ] %}
+            <label style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;">
+              <div>
+                <div style="font-size:13px; font-weight:500; color:var(--text-primary);">{{ label }}</div>
+              </div>
+              <div style="position:relative;">
+                <input type="checkbox" id="{{ key }}" {% if checked %}checked{% endif %}
+                       style="display:none;" onchange="saveNotifPref()">
+                <div onclick="document.getElementById('{{ key }}').click(); this.classList.toggle('on')"
+                     class="toggle-switch {% if checked %}on{% endif %}"
+                     style="width:42px; height:24px; border-radius:12px;
+                            background:{% if checked %}var(--brand){% else %}var(--bg-hover){% endif %};
+                            transition:background 0.2s; cursor:pointer; position:relative; border:1px solid var(--border-md);"
+                     id="{{ key }}-toggle">
+                  <div style="width:18px; height:18px; border-radius:50%; background:#fff;
+                              position:absolute; top:2px; transition:left 0.2s;
+                              left:{% if checked %}21px{% else %}2px{% endif %};"
+                       id="{{ key }}-knob"></div>
+                </div>
+              </div>
+            </label>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Account Info -->
+  <div class="card" style="margin-top:16px;">
+    <div class="card-header">
+      <span class="card-title"><i class="fa-solid fa-shield-halved" style="color:var(--brand-glow);"></i> Account Information</span>
+    </div>
+    <div class="card-body" style="padding:14px 20px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:16px;">
+        <div class="info-row">
+          <div class="info-row-label">Account ID</div>
+          <div class="info-row-value" style="font-family:monospace; font-size:12px;">#{{ current_user.id }}</div>
+        </div>
+        <div class="info-row">
+          <div class="info-row-label">Role</div>
+          <div class="info-row-value"><span class="badge-role {{ current_user.role }}">{{ current_user.role }}</span></div>
+        </div>
+        <div class="info-row">
+          <div class="info-row-label">Member Since</div>
+          <div class="info-row-value">{{ current_user.created_at.strftime('%B %d, %Y') }}</div>
+        </div>
+        {% if current_user.last_login %}
+        <div class="info-row">
+          <div class="info-row-label">Last Login</div>
+          <div class="info-row-value">{{ current_user.last_login.strftime('%b %d, %Y at %H:%M') }}</div>
+        </div>
+        {% endif %}
+      </div>
+
+      <div style="padding-top:14px; border-top:1px solid var(--border); margin-top:4px;">
+        <a href="{{ url_for('web.logout') }}" class="btn btn-danger btn-sm">
+          <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Fix responsive grid
+function fixProfileLayout() {
+  const grid = document.getElementById('profile-grid');
+  if (grid) grid.style.gridTemplateColumns = window.innerWidth < 780 ? '1fr' : '1fr 1fr';
+}
+window.addEventListener('resize', fixProfileLayout);
+fixProfileLayout();
+
+// Load stats
+async function loadStats() {
+  const resp = await API.get('/api/dashboard/stats');
+  if (!resp || !resp.ok) return;
+  const { data } = await resp.json();
+  animateCount(document.getElementById('stat-raised'), data.total || 0);
+  const assignedEl = document.getElementById('stat-assigned');
+  if (assignedEl) animateCount(assignedEl, data.by_status.in_progress || 0);
+  const resolvedEl = document.getElementById('stat-resolved');
+  if (resolvedEl) animateCount(resolvedEl, (data.by_status.resolved || 0) + (data.by_status.closed || 0));
+}
+
+// Profile form
+document.getElementById('profile-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('save-profile-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;margin-right:6px;"></span>Saving…';
+
+  const payload = {
+    name:       document.getElementById('p-name').value.trim(),
+    department: document.getElementById('p-dept').value.trim(),
+    phone:      document.getElementById('p-phone').value.trim(),
+  };
+
+  const resp = await API.put('/api/auth/profile', payload);
+  if (resp && resp.ok) {
+    showToast('Profile updated successfully!', 'success');
+  } else {
+    showToast('Failed to update profile', 'error');
+  }
+  btn.disabled = false;
+  btn.innerHTML = '<i class="fa-solid fa-floppy-disk"></i> Save Profile';
+});
+
+// Password strength meter
+document.getElementById('new-pwd').addEventListener('input', (e) => {
+  const pwd = e.target.value;
+  const strengthEl = document.getElementById('pwd-strength');
+  const bar = document.getElementById('pwd-strength-bar');
+  const label = document.getElementById('pwd-strength-label');
+
+  if (!pwd) { strengthEl.style.display = 'none'; return; }
+  strengthEl.style.display = 'block';
+
+  let score = 0;
+  if (pwd.length >= 8)  score++;
+  if (pwd.length >= 12) score++;
+  if (/[A-Z]/.test(pwd)) score++;
+  if (/[0-9]/.test(pwd)) score++;
+  if (/[^A-Za-z0-9]/.test(pwd)) score++;
+
+  const levels = [
+    { pct: 20, color: 'red',    text: 'Very weak' },
+    { pct: 40, color: 'red',    text: 'Weak' },
+    { pct: 60, color: 'amber',  text: 'Fair' },
+    { pct: 80, color: 'green',  text: 'Strong' },
+    { pct: 100, color: 'green', text: 'Very strong' },
+  ];
+  const lvl = levels[Math.min(score - 1, 4)] || levels[0];
+  bar.style.width = `${lvl.pct}%`;
+  bar.className = `progress-fill ${lvl.color}`;
+  label.textContent = lvl.text;
+  label.style.color = lvl.color === 'green' ? 'var(--success)' : lvl.color === 'amber' ? 'var(--warning)' : 'var(--error)';
+});
+
+// Password form
+document.getElementById('password-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const current = document.getElementById('current-pwd').value;
+  const newPwd  = document.getElementById('new-pwd').value;
+  const confirm = document.getElementById('confirm-pwd').value;
+
+  if (!current) { showToast('Enter your current password', 'error'); return; }
+  if (newPwd.length < 8) { showToast('New password must be at least 8 characters', 'error'); return; }
+  if (newPwd !== confirm) { showToast('Passwords do not match', 'error'); return; }
+
+  const resp = await API.put('/api/auth/profile', { current_password: current, new_password: newPwd });
+  if (resp && resp.ok) {
+    showToast('Password changed successfully!', 'success');
+    ['current-pwd','new-pwd','confirm-pwd'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('pwd-strength').style.display = 'none';
+  } else {
+    showToast('Password change failed. Check your current password.', 'error');
+  }
+});
+
+// Toggle switches
+function saveNotifPref() {
+  // In a real app, this would call the API
+  showToast('Preference saved', 'success', 1500);
+}
+
+// Update toggle UI on click
+document.querySelectorAll('[id$="-toggle"]').forEach(toggle => {
+  const id = toggle.id.replace('-toggle', '');
+  toggle.addEventListener('click', () => {
+    const cb = document.getElementById(id);
+    const knob = document.getElementById(`${id}-knob`);
+    const isOn = cb.checked;
+    toggle.style.background = isOn ? 'var(--brand)' : 'var(--bg-hover)';
+    knob.style.left = isOn ? '21px' : '2px';
+  });
+});
+
+loadStats();
+</script>
+{% endblock %}

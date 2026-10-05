@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Register — IT Help Desk</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card" style="max-width:520px;">
+    <div class="auth-logo">
+      <div class="auth-logo-icon">🎫</div>
+      <div class="auth-title">Create Account</div>
+      <div class="auth-subtitle">Join the IT Help Desk system</div>
+    </div>
+
+    <form id="register-form" novalidate>
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Full Name <span class="required">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="input-icon fa-solid fa-user"></i>
+            <input type="text" class="form-control" id="name" placeholder="John Smith" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Department</label>
+          <div class="input-icon-wrap">
+            <i class="input-icon fa-solid fa-building"></i>
+            <input type="text" class="form-control" id="department" placeholder="IT, Sales, HR...">
+          </div>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email Address <span class="required">*</span></label>
+        <div class="input-icon-wrap">
+          <i class="input-icon fa-solid fa-envelope"></i>
+          <input type="email" class="form-control" id="email" placeholder="you@company.com" required>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Phone Number</label>
+        <div class="input-icon-wrap">
+          <i class="input-icon fa-solid fa-phone"></i>
+          <input type="tel" class="form-control" id="phone" placeholder="+1-555-0100">
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Account Role <span class="required">*</span></label>
+        <select class="form-select" id="role">
+          <option value="user">User (Submit tickets)</option>
+          <option value="engineer">Engineer (Handle tickets)</option>
+          <option value="admin">Admin (Full access)</option>
+        </select>
+      </div>
+
+      <div class="grid-2">
+        <div class="form-group">
+          <label class="form-label">Password <span class="required">*</span></label>
+          <div class="input-icon-wrap" style="position:relative;">
+            <i class="input-icon fa-solid fa-lock"></i>
+            <input type="password" class="form-control" id="password" placeholder="Min 8 chars" required>
+            <button type="button" onclick="togglePwd('password','eye1')" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;">
+              <i class="fa-solid fa-eye" id="eye1"></i>
+            </button>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Confirm Password <span class="required">*</span></label>
+          <div class="input-icon-wrap" style="position:relative;">
+            <i class="input-icon fa-solid fa-lock"></i>
+            <input type="password" class="form-control" id="confirm-password" placeholder="Re-enter" required>
+          </div>
+        </div>
+      </div>
+
+      <!-- Password strength -->
+      <div style="margin-bottom:16px;">
+        <div style="display:flex; gap:4px; height:4px; border-radius:2px; overflow:hidden;">
+          <div id="str1" style="flex:1; background:var(--border); border-radius:2px; transition:.3s;"></div>
+          <div id="str2" style="flex:1; background:var(--border); border-radius:2px; transition:.3s;"></div>
+          <div id="str3" style="flex:1; background:var(--border); border-radius:2px; transition:.3s;"></div>
+          <div id="str4" style="flex:1; background:var(--border); border-radius:2px; transition:.3s;"></div>
+        </div>
+        <div id="strength-label" style="font-size:11px; color:var(--text-muted); margin-top:4px;"></div>
+      </div>
+
+      <button type="submit" class="btn btn-primary w-full" id="reg-btn">
+        <span id="reg-spinner" class="spinner hidden" style="width:16px;height:16px;"></span>
+        <i class="fa-solid fa-user-plus" id="reg-icon"></i>
+        Create Account
+      </button>
+    </form>
+
+    <p style="text-align:center; margin-top:20px; font-size:13px; color:var(--text-muted);">
+      Already have an account?
+      <a href="{{ url_for('web.login') }}" style="color:var(--brand-purple-glow);text-decoration:none;font-weight:600;">Sign in</a>
+    </p>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<script>
+  if (localStorage.getItem('hd-theme') === 'light') document.body.classList.add('light-mode');
+
+  function togglePwd(id, iconId) {
+    const el = document.getElementById(id);
+    const ic = document.getElementById(iconId);
+    el.type = el.type === 'password' ? 'text' : 'password';
+    ic.className = el.type === 'password' ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+  }
+
+  // Password strength
+  document.getElementById('password').addEventListener('input', (e) => {
+    const val = e.target.value;
+    let score = 0;
+    if (val.length >= 8) score++;
+    if (/[A-Z]/.test(val)) score++;
+    if (/[0-9]/.test(val)) score++;
+    if (/[^A-Za-z0-9]/.test(val)) score++;
+    const colors = ['', '#ef4444', '#f59e0b', '#22c55e', '#10b981'];
+    const labels = ['', 'Weak', 'Fair', 'Good', 'Strong'];
+    for (let i = 1; i <= 4; i++) {
+      document.getElementById(`str${i}`).style.background = i <= score ? colors[score] : 'var(--border)';
+    }
+    document.getElementById('strength-label').textContent = val ? labels[score] : '';
+    document.getElementById('strength-label').style.color = colors[score] || 'var(--text-muted)';
+  });
+
+  document.getElementById('register-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('name').value.trim();
+    const email = document.getElementById('email').value.trim().toLowerCase();
+    const password = document.getElementById('password').value;
+    const confirm = document.getElementById('confirm-password').value;
+    const role = document.getElementById('role').value;
+    const department = document.getElementById('department').value.trim();
+    const phone = document.getElementById('phone').value.trim();
+
+    if (!name || !email || !password) { showToast('Name, email and password are required', 'error'); return; }
+    if (password.length < 8) { showToast('Password must be at least 8 characters', 'error'); return; }
+    if (password !== confirm) { showToast('Passwords do not match', 'error'); return; }
+
+    const btn = document.getElementById('reg-btn');
+    btn.disabled = true;
+    document.getElementById('reg-spinner').classList.remove('hidden');
+    document.getElementById('reg-icon').classList.add('hidden');
+
+    try {
+      const resp = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ name, email, password, role, department, phone })
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        localStorage.setItem('access_token', data.data.access_token);
+        localStorage.setItem('refresh_token', data.data.refresh_token);
+        localStorage.setItem('user', JSON.stringify(data.data.user));
+        showToast('Account created! Redirecting...', 'success', 1500);
+        setTimeout(() => window.location.replace('/dashboard'), 800);
+      } else {
+        showToast(data.error || 'Registration failed', 'error');
+        btn.disabled = false;
+        document.getElementById('reg-spinner').classList.add('hidden');
+        document.getElementById('reg-icon').classList.remove('hidden');
+      }
+    } catch(err) {
+      showToast('Connection error. Try again.', 'error');
+      btn.disabled = false;
+      document.getElementById('reg-spinner').classList.add('hidden');
+      document.getElementById('reg-icon').classList.remove('hidden');
+    }
+  });
+
+  function showToast(message, type = 'info', duration = 4000) {
+    const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+    const container = document.getElementById('toast-container');
+    const toast = document.createElement('div');
+    toast.className = `toast-item ${type}`;
+    toast.innerHTML = `<span class="toast-icon">${icons[type]}</span><span class="toast-msg">${message}</span>`;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), duration);
+  }
+</script>
+</body>
+</html>

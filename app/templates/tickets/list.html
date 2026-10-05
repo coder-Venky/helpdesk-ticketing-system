@@ -1,0 +1,522 @@
+{% extends 'base.html' %}
+{% block title %}Tickets — HelpDesk Pro{% endblock %}
+{% block page_title %}Tickets{% endblock %}
+{% block page_subtitle %}Manage and track all support requests{% endblock %}
+
+{% block content %}
+<!-- Filter Bar -->
+<div class="filter-bar" role="search" aria-label="Ticket filters">
+  <!-- Search -->
+  <div class="search-input-wrap">
+    <i class="fa-solid fa-magnifying-glass search-icon" aria-hidden="true"></i>
+    <input type="text" class="form-control" id="search-input"
+           placeholder="Search tickets…" style="height:38px;"
+           aria-label="Search tickets">
+  </div>
+
+  <!-- Status filter -->
+  <select class="filter-select" id="filter-status" aria-label="Filter by status">
+    <option value="">All Statuses</option>
+    {% for s in statuses %}
+    <option value="{{ s }}">{{ s.replace('_',' ').title() }}</option>
+    {% endfor %}
+  </select>
+
+  <!-- Priority filter -->
+  <select class="filter-select" id="filter-priority" aria-label="Filter by priority">
+    <option value="">All Priorities</option>
+    {% for p in priorities %}
+    <option value="{{ p }}">{{ p.title() }}</option>
+    {% endfor %}
+  </select>
+
+  <!-- Category filter -->
+  <select class="filter-select" id="filter-category" aria-label="Filter by category">
+    <option value="">All Categories</option>
+    {% for c in categories %}
+    <option value="{{ c }}">{{ c }}</option>
+    {% endfor %}
+  </select>
+
+  {% if current_user.role in ('admin', 'engineer') %}
+  <select class="filter-select" id="filter-assigned" aria-label="Filter by assignee">
+    <option value="">All Assignees</option>
+    <option value="me">My Tickets</option>
+    <option value="unassigned">Unassigned</option>
+  </select>
+  {% endif %}
+
+  <!-- Date range -->
+  <div style="display:flex; gap:6px; align-items:center;">
+    <input type="date" class="form-control" id="filter-date-from"
+           style="height:38px; width:140px; font-size:12px;"
+           aria-label="From date">
+    <span style="color:var(--text-muted); font-size:12px;">to</span>
+    <input type="date" class="form-control" id="filter-date-to"
+           style="height:38px; width:140px; font-size:12px;"
+           aria-label="To date">
+  </div>
+
+  <!-- Reset -->
+  <button class="btn btn-ghost btn-sm" onclick="resetFilters()" aria-label="Reset filters">
+    <i class="fa-solid fa-rotate-left"></i> Reset
+  </button>
+
+  <!-- Actions -->
+  <div style="margin-left:auto; display:flex; gap:6px;">
+    {% if current_user.role == 'admin' %}
+    <a href="/api/reports/excel" class="btn btn-success btn-sm" title="Export Excel">
+      <i class="fa-solid fa-file-excel"></i> Excel
+    </a>
+    <a href="/api/reports/pdf" target="_blank" class="btn btn-secondary btn-sm" title="Export PDF">
+      <i class="fa-solid fa-file-pdf"></i> PDF
+    </a>
+    {% endif %}
+    <a href="{{ url_for('web.new_ticket') }}" class="btn btn-primary btn-sm">
+      <i class="fa-solid fa-plus"></i> New Ticket
+    </a>
+  </div>
+</div>
+
+<!-- Results summary -->
+<div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+  <div id="results-summary" style="font-size:12.5px; color:var(--text-muted);"></div>
+  <div style="display:flex; gap:4px;">
+    <button onclick="setView('table')" id="btn-view-table" class="btn btn-primary btn-icon btn-sm" title="Table view" aria-label="Table view">
+      <i class="fa-solid fa-table-list" style="font-size:11px;"></i>
+    </button>
+    <button onclick="setView('cards')" id="btn-view-cards" class="btn btn-secondary btn-icon btn-sm" title="Card view" aria-label="Card view">
+      <i class="fa-solid fa-grip" style="font-size:11px;"></i>
+    </button>
+  </div>
+</div>
+
+<!-- ─── Table View ─────────────────────────────────────────── -->
+<div class="card" id="table-view">
+  <div class="table-wrap">
+    <table class="hd-table" aria-label="Tickets table">
+      <thead>
+        <tr>
+          <th class="sortable" onclick="sortBy('ticket_number')" aria-sort="none">
+            # <i class="fa-solid fa-sort" style="font-size:8px; color:var(--text-muted); margin-left:3px;"></i>
+          </th>
+          <th>Subject</th>
+          <th class="sortable" onclick="sortBy('category')">
+            Category <i class="fa-solid fa-sort" style="font-size:8px; color:var(--text-muted);"></i>
+          </th>
+          <th class="sortable" onclick="sortBy('priority')">
+            Priority <i class="fa-solid fa-sort" style="font-size:8px; color:var(--text-muted);"></i>
+          </th>
+          <th class="sortable" onclick="sortBy('status')">
+            Status <i class="fa-solid fa-sort" style="font-size:8px; color:var(--text-muted);"></i>
+          </th>
+          <th>Assigned To</th>
+          <th class="sortable" onclick="sortBy('created_at')">
+            Created <i class="fa-solid fa-sort" style="font-size:8px; color:var(--text-muted);"></i>
+          </th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody id="tickets-tbody">
+        <tr>
+          <td colspan="8">
+            <div style="display:flex; align-items:center; justify-content:center; gap:10px; padding:32px; color:var(--text-muted);">
+              <span class="spinner dark"></span>
+              <span style="font-size:13px;">Loading tickets…</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  <div class="pagination-wrap hidden" id="pagination-wrap">
+    <div id="pagination-info"></div>
+    <div class="pagination-btns" id="pagination-btns"></div>
+  </div>
+</div>
+
+<!-- ─── Card View ──────────────────────────────────────────── -->
+<div id="cards-view" class="hidden">
+  <div class="grid-2" id="tickets-grid" style="gap:12px;"></div>
+  <div style="text-align:center; margin-top:16px;" id="pagination-wrap-cards" class="hidden">
+    <div class="pagination-btns" id="pagination-btns-cards" style="display:inline-flex;"></div>
+  </div>
+</div>
+
+<!-- Delete confirm modal -->
+<div class="modal-backdrop-custom hidden" id="delete-modal" role="dialog" aria-modal="true">
+  <div class="modal-box">
+    <div class="modal-header">
+      <h5><i class="fa-solid fa-triangle-exclamation" style="color:var(--error); margin-right:8px;"></i>Delete Ticket</h5>
+      <button class="btn btn-ghost btn-icon" onclick="closeDeleteModal()" aria-label="Close"><i class="fa-solid fa-xmark"></i></button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--text-secondary); font-size:13.5px; line-height:1.7;">
+        Are you sure you want to delete ticket <strong id="delete-ticket-id" style="color:var(--text-primary);"></strong>?
+        This action <strong>cannot be undone</strong> and all associated comments and attachments will be permanently removed.
+      </p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDeleteModal()">Cancel</button>
+      <button class="btn btn-danger" id="confirm-delete-btn" onclick="confirmDelete()">
+        <i class="fa-solid fa-trash"></i> Delete Permanently
+      </button>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+let currentPage = 1;
+let currentSort = 'created_at';
+let currentOrder = 'desc';
+let searchTimeout;
+let currentView = localStorage.getItem('tickets-view') || 'table';
+let pendingDeleteId = null;
+
+const filters = {
+  search: '', status: '', priority: '', category: '', assigned_to: '',
+  date_from: '', date_to: ''
+};
+
+setView(currentView, false);
+
+// ─── Load Tickets ──────────────────────────────────────────
+async function loadTickets(page = 1) {
+  currentPage = page;
+  const params = new URLSearchParams({
+    page, per_page: 15,
+    sort: currentSort, order: currentOrder,
+    ...Object.fromEntries(Object.entries(filters).filter(([,v]) => v))
+  });
+
+  showLoadingState();
+
+  try {
+    const resp = await API.get(`/api/tickets?${params}`);
+    if (!resp || !resp.ok) throw new Error();
+    const { data } = await resp.json();
+
+    // Update results summary
+    const sumEl = document.getElementById('results-summary');
+    if (sumEl) {
+      const total = data.pagination?.total || data.tickets.length;
+      sumEl.textContent = `${total} ticket${total !== 1 ? 's' : ''} found`;
+    }
+
+    if (!data.tickets.length) {
+      showEmptyState();
+      return;
+    }
+
+    if (currentView === 'table') {
+      renderTable(data.tickets);
+    } else {
+      renderCards(data.tickets);
+    }
+    renderPagination(data.pagination);
+
+  } catch(err) {
+    showError();
+  }
+}
+
+function showLoadingState() {
+  const tbody = document.getElementById('tickets-tbody');
+  const grid  = document.getElementById('tickets-grid');
+  const skeleton = `<div class="skeleton" style="height:44px; margin-bottom:4px; border-radius:6px;"></div>`;
+  const skeletons = Array(6).fill(skeleton).join('');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="8" style="padding:12px;">${skeletons}</td></tr>`;
+  if (grid)  grid.innerHTML = Array(6).fill(`<div class="skeleton" style="height:140px; border-radius:14px;"></div>`).join('');
+}
+
+function showEmptyState() {
+  const empty = `
+    <div class="empty-state" style="padding:48px;">
+      <div class="empty-icon"><i class="fa-solid fa-ticket"></i></div>
+      <div class="empty-title">No tickets found</div>
+      <div class="empty-desc">
+        ${Object.values(filters).some(v => v)
+          ? 'Try adjusting your filters to see more results.'
+          : 'No tickets have been created yet.'}
+      </div>
+      ${Object.values(filters).some(v => v)
+        ? `<button onclick="resetFilters()" class="btn btn-secondary mt-4">
+             <i class="fa-solid fa-rotate-left"></i> Clear Filters
+           </button>`
+        : `<a href="/tickets/new" class="btn btn-primary mt-4">
+             <i class="fa-solid fa-plus"></i> Create First Ticket
+           </a>`
+      }
+    </div>`;
+
+  const tbody = document.getElementById('tickets-tbody');
+  const grid  = document.getElementById('tickets-grid');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="8">${empty}</td></tr>`;
+  if (grid)  grid.innerHTML  = empty;
+  document.getElementById('pagination-wrap')?.classList.add('hidden');
+  document.getElementById('pagination-wrap-cards')?.classList.add('hidden');
+}
+
+function showError() {
+  const err = `<div style="text-align:center; padding:24px; color:var(--error); font-size:13px;">
+    <i class="fa-solid fa-circle-exclamation" style="font-size:24px; margin-bottom:8px; display:block;"></i>
+    Error loading tickets.
+    <button onclick="loadTickets()" class="btn btn-ghost btn-sm mt-3">Retry</button>
+  </div>`;
+  const tbody = document.getElementById('tickets-tbody');
+  if (tbody) tbody.innerHTML = `<tr><td colspan="8">${err}</td></tr>`;
+}
+
+// ─── Render Table ──────────────────────────────────────────
+function renderTable(tickets) {
+  const tbody = document.getElementById('tickets-tbody');
+  if (!tbody) return;
+  tbody.innerHTML = tickets.map(t => `
+    <tr onclick="window.location='/tickets/${t.id}'" style="cursor:pointer;" tabindex="0"
+        onkeydown="if(event.key==='Enter') window.location='/tickets/${t.id}'">
+      <td><span class="ticket-number">${escapeHtml(t.ticket_number)}</span></td>
+      <td>
+        <div class="ticket-title" style="max-width:280px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+          ${escapeHtml(t.title)}
+        </div>
+        <div class="ticket-meta">
+          ${t.comments_count} comment${t.comments_count !== 1 ? 's' : ''}
+          ${t.attachments_count ? ` · ${t.attachments_count} file${t.attachments_count !== 1 ? 's' : ''}` : ''}
+        </div>
+      </td>
+      <td><span style="font-size:12px; color:var(--text-secondary);">${escapeHtml(t.category)}</span></td>
+      <td><span class="badge-priority badge-${t.priority}">${t.priority}</span></td>
+      <td><span class="badge-status badge-${t.status}">${t.status.replace('_',' ')}</span></td>
+      <td>
+        ${t.assignee
+          ? `<div class="assignee-cell">
+              <div class="assignee-avatar">${escapeHtml(t.assignee.name[0])}</div>
+              <span style="font-size:12.5px;">${escapeHtml(t.assignee.name)}</span>
+            </div>`
+          : `<span style="font-size:12px; color:var(--text-muted); font-style:italic;">Unassigned</span>`
+        }
+      </td>
+      <td><span style="font-size:12px; color:var(--text-muted);">${fmtDate(t.created_at)}</span></td>
+      <td onclick="event.stopPropagation();">
+        <div class="row-actions">
+          <a href="/tickets/${t.id}" class="btn btn-secondary btn-icon btn-sm" title="View">
+            <i class="fa-solid fa-eye" style="font-size:11px;"></i>
+          </a>
+          ${t.status !== 'resolved' && t.status !== 'closed'
+            ? `<button class="btn btn-success btn-icon btn-sm" title="Resolve" onclick="quickResolve(${t.id})">
+                 <i class="fa-solid fa-circle-check" style="font-size:11px;"></i>
+               </button>`
+            : ''
+          }
+          {% if current_user.role == 'admin' %}
+          <button class="btn btn-danger btn-icon btn-sm" title="Delete"
+                  onclick="openDeleteModal(${t.id}, '${escapeHtml(t.ticket_number)}')">
+            <i class="fa-solid fa-trash" style="font-size:11px;"></i>
+          </button>
+          {% endif %}
+        </div>
+      </td>
+    </tr>`).join('');
+}
+
+// ─── Render Cards ──────────────────────────────────────────
+function renderCards(tickets) {
+  const grid = document.getElementById('tickets-grid');
+  if (!grid) return;
+  grid.innerHTML = tickets.map(t => `
+    <a href="/tickets/${t.id}" style="text-decoration:none;">
+      <div class="card" style="padding:18px; transition:all 0.2s; cursor:pointer;"
+           onmouseenter="this.style.transform='translateY(-3px)'; this.style.boxShadow='var(--shadow-lg)';"
+           onmouseleave="this.style.transform=''; this.style.boxShadow='';">
+        <div style="display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px;">
+          <span class="ticket-number">${escapeHtml(t.ticket_number)}</span>
+          <span class="badge-priority badge-${t.priority}">${t.priority}</span>
+        </div>
+        <div class="ticket-title" style="font-size:13.5px; margin-bottom:6px; line-height:1.4;
+             display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
+          ${escapeHtml(t.title)}
+        </div>
+        <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+          <span class="badge-status badge-${t.status}" style="font-size:9.5px;">${t.status.replace('_',' ')}</span>
+          <span style="font-size:11px; color:var(--text-muted);">${escapeHtml(t.category)}</span>
+        </div>
+        <div style="display:flex; align-items:center; justify-content:space-between; padding-top:10px; border-top:1px solid var(--border);">
+          ${t.assignee
+            ? `<div class="assignee-cell">
+                <div class="assignee-avatar" style="width:20px;height:20px;font-size:8px;">${escapeHtml(t.assignee.name[0])}</div>
+                <span style="font-size:11.5px; color:var(--text-secondary);">${escapeHtml(t.assignee.name)}</span>
+              </div>`
+            : `<span style="font-size:11px; color:var(--text-muted); font-style:italic;">Unassigned</span>`
+          }
+          <span style="font-size:11px; color:var(--text-muted);">${fmtDate(t.created_at)}</span>
+        </div>
+      </div>
+    </a>`).join('');
+}
+
+// ─── Pagination ────────────────────────────────────────────
+function renderPagination(pag) {
+  if (!pag || pag.pages <= 1) {
+    document.getElementById('pagination-wrap')?.classList.add('hidden');
+    document.getElementById('pagination-wrap-cards')?.classList.add('hidden');
+    return;
+  }
+
+  const wrap    = currentView === 'table' ? 'pagination-wrap' : 'pagination-wrap-cards';
+  const btnsEl  = currentView === 'table' ? 'pagination-btns' : 'pagination-btns-cards';
+  const infoEl  = document.getElementById('pagination-info');
+
+  document.getElementById(wrap)?.classList.remove('hidden');
+  if (infoEl) infoEl.textContent =
+    `Showing ${(pag.page-1)*pag.per_page + 1}–${Math.min(pag.page*pag.per_page, pag.total)} of ${pag.total}`;
+
+  const btns = document.getElementById(btnsEl);
+  if (!btns) return;
+  btns.innerHTML = '';
+
+  const addBtn = (label, page, active = false, disabled = false) => {
+    const btn = document.createElement('button');
+    btn.className = `page-btn${active ? ' active' : ''}`;
+    btn.innerHTML = label;
+    btn.disabled = disabled;
+    btn.onclick = () => !disabled && loadTickets(page);
+    btns.appendChild(btn);
+  };
+
+  addBtn('<i class="fa-solid fa-chevron-left" style="font-size:10px;"></i>', pag.page - 1, false, !pag.has_prev);
+
+  const start = Math.max(1, pag.page - 2);
+  const end   = Math.min(pag.pages, pag.page + 2);
+  if (start > 1) { addBtn('1', 1); if (start > 2) addBtn('…', null, false, true); }
+  for (let p = start; p <= end; p++) addBtn(p, p, p === pag.page);
+  if (end < pag.pages) { if (end < pag.pages - 1) addBtn('…', null, false, true); addBtn(pag.pages, pag.pages); }
+
+  addBtn('<i class="fa-solid fa-chevron-right" style="font-size:10px;"></i>', pag.page + 1, false, !pag.has_next);
+}
+
+// ─── View Toggle ──────────────────────────────────────────
+function setView(view, reload = true) {
+  currentView = view;
+  localStorage.setItem('tickets-view', view);
+
+  document.getElementById('table-view').classList.toggle('hidden', view !== 'table');
+  document.getElementById('cards-view').classList.toggle('hidden', view !== 'cards');
+  document.getElementById('btn-view-table').className = `btn btn-icon btn-sm ${view === 'table' ? 'btn-primary' : 'btn-secondary'}`;
+  document.getElementById('btn-view-cards').className = `btn btn-icon btn-sm ${view === 'cards' ? 'btn-primary' : 'btn-secondary'}`;
+
+  if (reload) loadTickets(1);
+}
+
+// ─── Sort / Filter ─────────────────────────────────────────
+function sortBy(col) {
+  currentOrder = currentSort === col ? (currentOrder === 'desc' ? 'asc' : 'desc') : 'desc';
+  currentSort = col;
+  loadTickets(1);
+}
+
+function resetFilters() {
+  ['search-input','filter-status','filter-priority','filter-category','filter-date-from','filter-date-to'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const assigned = document.getElementById('filter-assigned');
+  if (assigned) assigned.value = '';
+  Object.keys(filters).forEach(k => filters[k] = '');
+  loadTickets(1);
+}
+
+// ─── Quick Actions ─────────────────────────────────────────
+async function quickResolve(id) {
+  const resp = await API.put(`/api/tickets/${id}`, { status: 'resolved' });
+  if (resp && resp.ok) {
+    showToast('Ticket marked as resolved', 'success');
+    loadTickets(currentPage);
+  } else {
+    showToast('Failed to update ticket', 'error');
+  }
+}
+
+// ─── Delete Modal ──────────────────────────────────────────
+function openDeleteModal(id, ticketNum) {
+  pendingDeleteId = id;
+  document.getElementById('delete-ticket-id').textContent = ticketNum;
+  document.getElementById('delete-modal').classList.remove('hidden');
+}
+
+function closeDeleteModal() {
+  document.getElementById('delete-modal').classList.add('hidden');
+  pendingDeleteId = null;
+}
+
+async function confirmDelete() {
+  if (!pendingDeleteId) return;
+  const btn = document.getElementById('confirm-delete-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner" style="width:14px;height:14px;margin-right:6px;"></span>Deleting…';
+
+  try {
+    const resp = await API.delete(`/api/tickets/${pendingDeleteId}`);
+    if (resp && resp.ok) {
+      showToast('Ticket deleted successfully', 'success');
+      closeDeleteModal();
+      loadTickets(currentPage);
+    } else {
+      showToast('Failed to delete ticket', 'error');
+    }
+  } catch(e) {
+    showToast('Error deleting ticket', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-trash"></i> Delete Permanently';
+  }
+}
+
+// ─── Event Listeners ───────────────────────────────────────
+document.getElementById('search-input').addEventListener('input', (e) => {
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    filters.search = e.target.value.trim();
+    loadTickets(1);
+  }, 400);
+});
+
+['filter-status','filter-priority','filter-category'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('change', (e) => {
+    const key = id.replace('filter-', '');
+    filters[key] = e.target.value;
+    el.classList.toggle('has-value', !!e.target.value);
+    loadTickets(1);
+  });
+});
+
+const assignedEl = document.getElementById('filter-assigned');
+if (assignedEl) assignedEl.addEventListener('change', (e) => {
+  filters.assigned_to = e.target.value;
+  loadTickets(1);
+});
+
+['filter-date-from','filter-date-to'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('change', (e) => {
+    const key = id === 'filter-date-from' ? 'date_from' : 'date_to';
+    filters[key] = e.target.value;
+    loadTickets(1);
+  });
+});
+
+// Close delete modal on backdrop click
+document.getElementById('delete-modal').addEventListener('click', (e) => {
+  if (e.target === e.currentTarget) closeDeleteModal();
+});
+
+// Init
+loadTickets();
+</script>
+{% endblock %}

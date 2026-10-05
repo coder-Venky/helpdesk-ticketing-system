@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sign in to HelpDesk Pro — Professional IT Ticket Management">
+  <title>Sign In — HelpDesk Pro</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+
+<!-- Animated background canvas -->
+<canvas id="bg-canvas" style="position:fixed;inset:0;z-index:0;pointer-events:none;" aria-hidden="true"></canvas>
+
+<!-- Floating orbs -->
+<div style="position:fixed;top:15%;left:10%;width:400px;height:400px;border-radius:50%;background:radial-gradient(circle,rgba(37,99,235,0.12) 0%,transparent 70%);pointer-events:none;z-index:0;animation:orb1 8s ease-in-out infinite;"></div>
+<div style="position:fixed;bottom:20%;right:8%;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,0.10) 0%,transparent 70%);pointer-events:none;z-index:0;animation:orb2 10s ease-in-out infinite;"></div>
+
+<div class="auth-page" style="position:relative;z-index:1;">
+  <div style="width:100%; max-width:440px; padding:16px;">
+    <div class="auth-card">
+      <!-- Logo -->
+      <div class="auth-logo">
+        <div class="auth-logo-icon" aria-hidden="true">
+          <svg width="28" height="28" viewBox="0 0 20 20" fill="none">
+            <rect x="2" y="2" width="7" height="7" rx="2" fill="white" opacity="0.9"/>
+            <rect x="11" y="2" width="7" height="7" rx="2" fill="white" opacity="0.6"/>
+            <rect x="2" y="11" width="7" height="7" rx="2" fill="white" opacity="0.6"/>
+            <rect x="11" y="11" width="7" height="7" rx="2" fill="white" opacity="0.9"/>
+          </svg>
+        </div>
+        <h1 class="auth-title">Welcome back</h1>
+        <p class="auth-subtitle">Sign in to your HelpDesk Pro account</p>
+      </div>
+
+      <!-- Flash messages -->
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+          <div style="padding:10px 14px; margin-bottom:16px; border-radius:var(--radius-sm); font-size:13px;
+                background:rgba({% if category=='success' %}34,197,94{% elif category=='error' or category=='danger' %}239,68,68{% else %}37,99,235{% endif %},0.12);
+                border:1px solid rgba({% if category=='success' %}34,197,94{% elif category=='error' or category=='danger' %}239,68,68{% else %}37,99,235{% endif %},0.3);
+                color:{% if category=='success' %}#4ade80{% elif category=='error' or category=='danger' %}#f87171{% else %}#60a5fa{% endif %};">
+            <i class="fa-solid fa-{% if category=='success' %}circle-check{% elif category=='error' or category=='danger' %}circle-exclamation{% else %}circle-info{% endif %}" style="margin-right:6px;"></i>
+            {{ message }}
+          </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      <!-- Login Form -->
+      <form id="login-form" novalidate>
+        <div class="form-group">
+          <label class="form-label" for="email">Email Address <span class="required">*</span></label>
+          <div class="input-icon-wrap">
+            <i class="input-icon fa-solid fa-envelope" aria-hidden="true"></i>
+            <input type="email" class="form-control" id="email"
+                   placeholder="you@company.com" required autofocus
+                   autocomplete="email">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+            <label class="form-label" for="password" style="margin-bottom:0;">Password <span class="required">*</span></label>
+            <a href="{{ url_for('web.forgot_password') }}"
+               style="color:var(--brand-glow); font-size:11.5px; text-decoration:none; font-weight:500;">
+              Forgot password?
+            </a>
+          </div>
+          <div class="input-icon-wrap" style="position:relative;">
+            <i class="input-icon fa-solid fa-lock" aria-hidden="true"></i>
+            <input type="password" class="form-control" id="password"
+                   placeholder="••••••••" required
+                   autocomplete="current-password">
+            <button type="button" onclick="togglePwd('password','eye-icon')"
+                    style="position:absolute;right:12px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text-muted);cursor:pointer;padding:4px;"
+                    aria-label="Toggle password visibility">
+              <i class="fa-solid fa-eye" id="eye-icon"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Remember me -->
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;">
+          <input type="checkbox" id="remember-me" style="accent-color:var(--brand); width:14px; height:14px;" name="remember">
+          <label for="remember-me" style="font-size:12.5px; color:var(--text-secondary); cursor:pointer;">
+            Keep me signed in for 30 days
+          </label>
+        </div>
+
+        <button type="submit" class="btn btn-primary w-full btn-lg" id="login-btn" style="justify-content:center; margin-top:4px;">
+          <span id="login-spinner" class="spinner hidden" style="width:16px;height:16px;border-top-color:#fff;border-color:rgba(255,255,255,0.25);"></span>
+          <i class="fa-solid fa-right-to-bracket" id="login-icon"></i>
+          <span id="login-text">Sign In</span>
+        </button>
+      </form>
+
+      <div class="auth-divider">or continue with</div>
+
+      <a href="{{ url_for('web.otp_login') }}" class="btn btn-secondary w-full btn-lg" style="justify-content:center;">
+        <i class="fa-solid fa-shield-halved" style="color:var(--brand-glow);"></i>
+        Sign in with OTP
+      </a>
+
+      <p style="text-align:center; margin-top:20px; font-size:13px; color:var(--text-muted);">
+        Don't have an account?
+        <a href="{{ url_for('web.register') }}"
+           style="color:var(--brand-glow); text-decoration:none; font-weight:600;">
+          Create account
+        </a>
+      </p>
+
+      <!-- Demo Accounts -->
+      <div style="margin-top:20px; padding:14px; background:rgba(37,99,235,0.06); border:1px solid rgba(37,99,235,0.18); border-radius:var(--radius-sm);">
+        <div style="font-weight:700; color:var(--brand-glow); margin-bottom:10px; font-size:12px; text-transform:uppercase; letter-spacing:0.05em;">
+          🔑 Demo Accounts
+        </div>
+        <div style="display:grid; gap:6px; font-size:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:var(--bg-input); border-radius:6px;">
+            <div>
+              <span class="badge-role admin" style="margin-right:6px;">admin</span>
+              <span style="color:var(--text-secondary);">admin@helpdesk.com</span>
+            </div>
+            <button onclick="fillDemo('admin@helpdesk.com','Admin@123')"
+                    class="btn btn-ghost btn-sm" style="font-size:11px; padding:3px 8px;">
+              Use
+            </button>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:var(--bg-input); border-radius:6px;">
+            <div>
+              <span class="badge-role engineer" style="margin-right:6px;">engineer</span>
+              <span style="color:var(--text-secondary);">alex@helpdesk.com</span>
+            </div>
+            <button onclick="fillDemo('alex@helpdesk.com','Eng@12345')"
+                    class="btn btn-ghost btn-sm" style="font-size:11px; padding:3px 8px;">
+              Use
+            </button>
+          </div>
+          <div style="display:flex; justify-content:space-between; align-items:center; padding:5px 8px; background:var(--bg-input); border-radius:6px;">
+            <div>
+              <span class="badge-role user" style="margin-right:6px;">user</span>
+              <span style="color:var(--text-secondary);">john@company.com</span>
+            </div>
+            <button onclick="fillDemo('john@company.com','User@1234')"
+                    class="btn btn-ghost btn-sm" style="font-size:11px; padding:3px 8px;">
+              Use
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <p style="text-align:center; margin-top:20px; font-size:11.5px; color:var(--text-muted);">
+      HelpDesk Pro &copy; 2026 · IT Support System
+    </p>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<style>
+@keyframes orb1 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  50%      { transform: translate(20px,-30px) scale(1.05); }
+}
+@keyframes orb2 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  50%      { transform: translate(-25px,20px) scale(1.08); }
+}
+</style>
+
+<script>
+// Theme
+if (localStorage.getItem('hd-theme') === 'light') document.body.classList.add('light-mode');
+
+function togglePwd(inputId, iconId) {
+  const inp = document.getElementById(inputId);
+  const icon = document.getElementById(iconId);
+  const isText = inp.type === 'password';
+  inp.type = isText ? 'text' : 'password';
+  icon.className = isText ? 'fa-solid fa-eye-slash' : 'fa-solid fa-eye';
+}
+
+function fillDemo(email, pwd) {
+  document.getElementById('email').value = email;
+  document.getElementById('password').value = pwd;
+  document.getElementById('email').focus();
+}
+
+// Login submit
+document.getElementById('login-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const email    = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  if (!email || !password) { showToast('Please fill in all fields', 'error'); return; }
+
+  const btn     = document.getElementById('login-btn');
+  const spinner = document.getElementById('login-spinner');
+  const icon    = document.getElementById('login-icon');
+  const text    = document.getElementById('login-text');
+
+  btn.disabled = true;
+  spinner.classList.remove('hidden');
+  icon.classList.add('hidden');
+  text.textContent = 'Signing in...';
+
+  try {
+    const resp = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ email, password })
+    });
+    const data = await resp.json();
+
+    if (resp.ok) {
+      localStorage.setItem('access_token', data.data.access_token);
+      localStorage.setItem('refresh_token', data.data.refresh_token);
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+      showToast('Login successful! Redirecting…', 'success', 1500);
+      setTimeout(() => window.location.replace('/dashboard'), 900);
+    } else {
+      showToast(data.error || 'Login failed. Please check your credentials.', 'error');
+      btn.disabled = false;
+      spinner.classList.add('hidden');
+      icon.classList.remove('hidden');
+      text.textContent = 'Sign In';
+    }
+  } catch(err) {
+    showToast('Connection error. Please try again.', 'error');
+    btn.disabled = false;
+    spinner.classList.add('hidden');
+    icon.classList.remove('hidden');
+    text.textContent = 'Sign In';
+  }
+});
+
+function showToast(message, type = 'info', duration = 4000) {
+  const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+  const container = document.getElementById('toast-container');
+  const toast = document.createElement('div');
+  toast.className = `toast-item ${type}`;
+  toast.innerHTML = `<span class="toast-icon">${icons[type]}</span><div class="toast-body"><div class="toast-msg">${message}</div></div>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.style.transition = 'all 0.3s ease';
+    toast.style.opacity = '0';
+    toast.style.transform = 'translateX(20px)';
+    setTimeout(() => toast.remove(), 300);
+  }, duration);
+}
+
+// Particle background
+const canvas = document.getElementById('bg-canvas');
+const ctx2   = canvas.getContext('2d');
+canvas.width  = window.innerWidth;
+canvas.height = window.innerHeight;
+window.addEventListener('resize', () => {
+  canvas.width  = window.innerWidth;
+  canvas.height = window.innerHeight;
+});
+
+const particles = Array.from({ length: 50 }, () => ({
+  x: Math.random() * canvas.width,
+  y: Math.random() * canvas.height,
+  r: Math.random() * 1.5 + 0.5,
+  vx: (Math.random() - 0.5) * 0.3,
+  vy: (Math.random() - 0.5) * 0.3,
+  alpha: Math.random() * 0.35 + 0.05,
+}));
+
+const connectDist = 120;
+
+function drawFrame() {
+  ctx2.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Connect nearby particles
+  for (let i = 0; i < particles.length; i++) {
+    for (let j = i + 1; j < particles.length; j++) {
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const d  = Math.sqrt(dx*dx + dy*dy);
+      if (d < connectDist) {
+        ctx2.beginPath();
+        ctx2.moveTo(particles[i].x, particles[i].y);
+        ctx2.lineTo(particles[j].x, particles[j].y);
+        ctx2.strokeStyle = `rgba(37,99,235,${0.06 * (1 - d/connectDist)})`;
+        ctx2.lineWidth = 1;
+        ctx2.stroke();
+      }
+    }
+  }
+
+  particles.forEach(p => {
+    ctx2.beginPath();
+    ctx2.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx2.fillStyle = `rgba(37,99,235,${p.alpha})`;
+    ctx2.fill();
+    p.x += p.vx; p.y += p.vy;
+    if (p.x < 0 || p.x > canvas.width)  p.vx *= -1;
+    if (p.y < 0 || p.y > canvas.height) p.vy *= -1;
+  });
+
+  requestAnimationFrame(drawFrame);
+}
+drawFrame();
+</script>
+</body>
+</html>

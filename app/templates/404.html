@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>404 — Page Not Found | IT Help Desk</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/main.css') }}">
+</head>
+<body>
+<div class="auth-page">
+  <div style="text-align:center; animation: slideUp 0.4s ease;">
+    <div style="font-size:100px; margin-bottom:16px; line-height:1;">🎫</div>
+    <div style="font-size:72px; font-weight:800; background:linear-gradient(135deg,#6366f1,#8b5cf6); -webkit-background-clip:text; -webkit-text-fill-color:transparent; line-height:1;">404</div>
+    <div style="font-size:22px; font-weight:700; color:var(--text-primary); margin:12px 0 8px;">Page Not Found</div>
+    <div style="font-size:14px; color:var(--text-secondary); margin-bottom:28px;">The page you're looking for doesn't exist or was moved.</div>
+    <div style="display:flex; gap:10px; justify-content:center;">
+      <a href="/dashboard" class="btn btn-primary">
+        <i class="fa-solid fa-house"></i> Go to Dashboard
+      </a>
+      <a href="/tickets" class="btn btn-secondary">
+        <i class="fa-solid fa-ticket"></i> View Tickets
+      </a>
+    </div>
+  </div>
+</div>
+<script>if (localStorage.getItem('hd-theme') === 'light') document.body.classList.add('light-mode');</script>
+</body>
+</html>

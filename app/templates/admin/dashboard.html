@@ -1,0 +1,657 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard — HelpDesk Pro{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+{% block page_subtitle %}Welcome back, {{ current_user.name.split()[0] }} 👋{% endblock %}
+
+{% block extra_css %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+{% endblock %}
+
+{% block content %}
+<!-- ─── KPI Stat Cards ──────────────────────────────────────── -->
+<div class="stat-cards" id="stat-cards">
+  <!-- Skeleton loading state -->
+  <div class="stat-card blue">
+    <div class="stat-card-top">
+      <div class="stat-icon blue"><i class="fa-solid fa-ticket"></i></div>
+      <div class="stat-trend up" id="trend-total" style="opacity:0;">↑</div>
+    </div>
+    <div>
+      <div class="stat-value" id="stat-total">—</div>
+      <div class="stat-label">Total Tickets</div>
+    </div>
+  </div>
+
+  <div class="stat-card amber">
+    <div class="stat-card-top">
+      <div class="stat-icon amber"><i class="fa-solid fa-circle-dot"></i></div>
+      <div class="stat-trend" id="trend-open" style="opacity:0;">—</div>
+    </div>
+    <div>
+      <div class="stat-value" id="stat-open">—</div>
+      <div class="stat-label">Open Tickets</div>
+    </div>
+  </div>
+
+  <div class="stat-card blue">
+    <div class="stat-card-top">
+      <div class="stat-icon blue"><i class="fa-solid fa-spinner"></i></div>
+    </div>
+    <div>
+      <div class="stat-value" id="stat-inprogress">—</div>
+      <div class="stat-label">In Progress</div>
+    </div>
+  </div>
+
+  <div class="stat-card green">
+    <div class="stat-card-top">
+      <div class="stat-icon green"><i class="fa-solid fa-circle-check"></i></div>
+      <div class="stat-trend up" id="trend-resolved" style="opacity:0;">—</div>
+    </div>
+    <div>
+      <div class="stat-value" id="stat-resolved">—</div>
+      <div class="stat-label">Resolved</div>
+    </div>
+  </div>
+
+  <div class="stat-card slate">
+    <div class="stat-card-top">
+      <div class="stat-icon slate"><i class="fa-solid fa-lock"></i></div>
+    </div>
+    <div>
+      <div class="stat-value" id="stat-closed">—</div>
+      <div class="stat-label">Closed</div>
+    </div>
+  </div>
+
+  <div class="stat-card red">
+    <div class="stat-card-top">
+      <div class="stat-icon red"><i class="fa-solid fa-triangle-exclamation"></i></div>
+    </div>
+    <div>
+      <div class="stat-value" id="stat-critical">—</div>
+      <div class="stat-label">Critical Priority</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Secondary Metrics ───────────────────────────────────── -->
+<div class="grid-3" style="margin-bottom:20px;">
+  <div class="card" style="padding:16px; display:flex; align-items:center; gap:14px;">
+    <div class="stat-icon green" style="width:42px;height:42px;"><i class="fa-solid fa-clock"></i></div>
+    <div>
+      <div style="font-size:20px; font-weight:800; color:var(--text-primary);" id="avg-resolution">—</div>
+      <div style="font-size:11px; color:var(--text-secondary); font-weight:500;">Avg Resolution (hrs)</div>
+    </div>
+  </div>
+  <div class="card" style="padding:16px; display:flex; align-items:center; gap:14px;">
+    <div class="stat-icon amber" style="width:42px;height:42px;"><i class="fa-solid fa-percent"></i></div>
+    <div>
+      <div style="font-size:20px; font-weight:800; color:var(--text-primary);" id="resolution-rate">—</div>
+      <div style="font-size:11px; color:var(--text-secondary); font-weight:500;">Resolution Rate</div>
+    </div>
+  </div>
+  <div class="card" style="padding:16px; display:flex; align-items:center; gap:14px;">
+    <div class="stat-icon red" style="width:42px;height:42px;"><i class="fa-solid fa-fire"></i></div>
+    <div>
+      <div style="font-size:20px; font-weight:800; color:var(--text-primary);" id="stat-high">—</div>
+      <div style="font-size:11px; color:var(--text-secondary); font-weight:500;">High Priority</div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Charts Row 1 ────────────────────────────────────────── -->
+<div style="display:grid; grid-template-columns:1fr 1.8fr; gap:16px; margin-bottom:16px;" class="chart-row-1">
+  <!-- Status Donut -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-chart-pie" style="color:var(--brand-glow);"></i>
+        Status Overview
+      </span>
+    </div>
+    <div class="card-body" style="padding:16px; display:flex; flex-direction:column; align-items:center;">
+      <div class="chart-container" style="height:200px; width:100%; max-width:220px;">
+        <canvas id="statusChart" role="img" aria-label="Status distribution chart"></canvas>
+      </div>
+      <div class="chart-legend" id="status-legend"></div>
+    </div>
+  </div>
+
+  <!-- Ticket Volume Line Chart -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-chart-line" style="color:var(--brand-glow);"></i>
+        Ticket Volume (Last 30 Days)
+      </span>
+      <div style="display:flex; gap:6px; align-items:center;">
+        <button onclick="changePeriod(7)" id="btn-7d" class="btn btn-secondary btn-sm">7D</button>
+        <button onclick="changePeriod(14)" id="btn-14d" class="btn btn-secondary btn-sm">14D</button>
+        <button onclick="changePeriod(30)" id="btn-30d" class="btn btn-primary btn-sm">30D</button>
+      </div>
+    </div>
+    <div class="card-body" style="padding:16px;">
+      <div class="chart-container" style="height:200px;">
+        <canvas id="timelineChart" role="img" aria-label="Ticket volume trend"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Charts Row 2 ────────────────────────────────────────── -->
+<div class="grid-2" style="margin-bottom:16px;">
+  <!-- Priority Distribution -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-chart-bar" style="color:var(--brand-glow);"></i>
+        Priority Distribution
+      </span>
+    </div>
+    <div class="card-body" style="padding:16px;">
+      <div class="chart-container" style="height:190px;">
+        <canvas id="priorityChart" role="img" aria-label="Priority distribution chart"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <!-- By Category -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-layer-group" style="color:var(--brand-glow);"></i>
+        By Category
+      </span>
+    </div>
+    <div class="card-body" style="padding:16px;">
+      <div class="chart-container" style="height:190px;">
+        <canvas id="categoryChart" role="img" aria-label="Category breakdown chart"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Engineer Performance (Admin only) ─────────────────── -->
+{% if current_user.role == 'admin' %}
+<div class="card" style="margin-bottom:16px;">
+  <div class="card-header">
+    <span class="card-title">
+      <i class="fa-solid fa-users" style="color:var(--brand-glow);"></i>
+      Engineer Performance
+    </span>
+    <div class="flex gap-8">
+      <a href="/api/reports/pdf" target="_blank" class="btn btn-secondary btn-sm">
+        <i class="fa-solid fa-file-pdf"></i> PDF
+      </a>
+      <a href="/api/reports/excel" target="_blank" class="btn btn-success btn-sm">
+        <i class="fa-solid fa-file-excel"></i> Excel
+      </a>
+    </div>
+  </div>
+  <div class="card-body" style="padding:16px;">
+    <div class="chart-container" style="height:200px;">
+      <canvas id="engineerChart" role="img" aria-label="Engineer performance chart"></canvas>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ─── Bottom Grid: Recent Tickets + Activity ─────────────── -->
+<div style="display:grid; grid-template-columns:1fr 320px; gap:16px; align-items:start;">
+
+  <!-- Recent Tickets Table -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-clock-rotate-left" style="color:var(--brand-glow);"></i>
+        Recent Tickets
+      </span>
+      <a href="{{ url_for('web.new_ticket') }}" class="btn btn-primary btn-sm">
+        <i class="fa-solid fa-plus"></i> New Ticket
+      </a>
+    </div>
+    <div class="table-wrap">
+      <table class="hd-table" aria-label="Recent tickets">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Subject</th>
+            <th>Priority</th>
+            <th>Status</th>
+            <th>Assignee</th>
+            <th>Created</th>
+          </tr>
+        </thead>
+        <tbody id="recent-tickets-body">
+          <tr>
+            <td colspan="6" style="text-align:center; padding:28px;">
+              <span class="spinner dark" style="margin-right:8px;"></span>
+              <span style="color:var(--text-muted); font-size:12.5px;">Loading tickets...</span>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="padding:11px 18px; border-top:1px solid var(--border);">
+      <a href="{{ url_for('web.tickets') }}" class="btn btn-ghost btn-sm" style="color:var(--brand-glow);">
+        View all tickets <i class="fa-solid fa-arrow-right" style="font-size:10px;"></i>
+      </a>
+    </div>
+  </div>
+
+  <!-- Recent Activity Timeline -->
+  <div class="card" style="height:fit-content;">
+    <div class="card-header">
+      <span class="card-title">
+        <i class="fa-solid fa-timeline" style="color:var(--brand-glow);"></i>
+        Activity Feed
+      </span>
+    </div>
+    <div class="card-body" id="activity-feed" style="padding:16px 20px; max-height:420px; overflow-y:auto;">
+      <div class="timeline">
+        <div class="activity-item" style="color:var(--text-muted); font-size:12px; padding:8px 0;">
+          <span class="spinner dark" style="position:absolute;left:-24px;top:0;"></span>
+          Loading activity...
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// ─── Chart.js Global Config ───────────────────────────────
+Chart.defaults.color = '#94a3b8';
+Chart.defaults.borderColor = 'rgba(148,163,184,0.08)';
+Chart.defaults.font.family = 'Inter';
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.cornerRadius = 8;
+Chart.defaults.plugins.tooltip.titleFont = { size: 12, weight: 600 };
+Chart.defaults.plugins.tooltip.bodyFont = { size: 11 };
+
+const C = {
+  blue:   '#3b82f6',
+  indigo: '#6366f1',
+  amber:  '#f59e0b',
+  green:  '#22c55e',
+  slate:  '#64748b',
+  red:    '#ef4444',
+  purple: '#8b5cf6',
+  pink:   '#ec4899',
+};
+
+let charts = {};
+let allDailyTickets = [];
+
+function initChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  const canvas = document.getElementById(id);
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  charts[id] = new Chart(ctx, config);
+}
+
+// ─── Period Selector ──────────────────────────────────────
+let currentPeriod = 30;
+
+function changePeriod(days) {
+  currentPeriod = days;
+  ['7d','14d','30d'].forEach(d => {
+    const btn = document.getElementById(`btn-${d}`);
+    if (btn) {
+      const active = parseInt(d) === days;
+      btn.className = `btn btn-sm ${active ? 'btn-primary' : 'btn-secondary'}`;
+    }
+  });
+  const sliced = allDailyTickets.slice(-days);
+  renderTimelineChart(sliced);
+}
+
+function renderTimelineChart(data) {
+  const labels = data.map(d => {
+    const dt = new Date(d.date);
+    return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  });
+  const counts = data.map(d => d.count);
+
+  // Gradient fill
+  const canvas = document.getElementById('timelineChart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const grad = ctx.createLinearGradient(0, 0, 0, 200);
+  grad.addColorStop(0, 'rgba(37,99,235,0.2)');
+  grad.addColorStop(1, 'rgba(37,99,235,0)');
+
+  initChart('timelineChart', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Tickets',
+        data: counts,
+        borderColor: C.blue,
+        backgroundColor: grad,
+        borderWidth: 2.5,
+        pointBackgroundColor: C.blue,
+        pointBorderColor: '#0f172a',
+        pointBorderWidth: 2,
+        pointRadius: 3,
+        pointHoverRadius: 6,
+        fill: true,
+        tension: 0.45,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => items[0].label,
+            label: (item) => ` ${item.raw} ticket${item.raw !== 1 ? 's' : ''}`,
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(148,163,184,0.06)' },
+          ticks: { maxTicksLimit: 8, font: { size: 10 } }
+        },
+        y: {
+          grid: { color: 'rgba(148,163,184,0.06)' },
+          ticks: { stepSize: 1, font: { size: 10 } },
+          beginAtZero: true
+        }
+      },
+      interaction: { mode: 'index', intersect: false }
+    }
+  });
+}
+
+// ─── Main Load ────────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const resp = await API.get('/api/dashboard/stats');
+    if (!resp || !resp.ok) return;
+    const { data } = await resp.json();
+
+    // Animate KPI counts
+    const kpiMap = {
+      'stat-total':      data.total,
+      'stat-open':       data.by_status.open,
+      'stat-inprogress': data.by_status.in_progress,
+      'stat-resolved':   data.by_status.resolved,
+      'stat-closed':     data.by_status.closed,
+      'stat-critical':   data.by_priority.critical,
+      'stat-high':       data.by_priority.high,
+    };
+
+    Object.entries(kpiMap).forEach(([id, val]) => {
+      const el = document.getElementById(id);
+      if (el && val !== undefined) animateCount(el, val);
+    });
+
+    // Resolution metrics
+    const resolvedEl = document.getElementById('avg-resolution');
+    if (resolvedEl) resolvedEl.textContent = data.avg_resolution_hours ? data.avg_resolution_hours + 'h' : 'N/A';
+
+    const rateEl = document.getElementById('resolution-rate');
+    if (rateEl) {
+      const resolved = (data.by_status.resolved || 0) + (data.by_status.closed || 0);
+      const rate = data.total > 0 ? Math.round((resolved / data.total) * 100) : 0;
+      rateEl.textContent = rate + '%';
+    }
+
+    // ─── Status Donut ──────────────────────────────────────
+    const statusData = [
+      data.by_status.open, data.by_status.in_progress,
+      data.by_status.resolved, data.by_status.closed
+    ];
+    const statusLabels = ['Open', 'In Progress', 'Resolved', 'Closed'];
+    const statusColors = [C.indigo, C.amber, C.green, C.slate];
+
+    initChart('statusChart', {
+      type: 'doughnut',
+      data: {
+        labels: statusLabels,
+        datasets: [{
+          data: statusData,
+          backgroundColor: statusColors,
+          borderWidth: 0,
+          hoverOffset: 8,
+          hoverBorderWidth: 0,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: (ctx) => ` ${ctx.label}: ${ctx.raw} (${data.total > 0 ? Math.round(ctx.raw/data.total*100) : 0}%)`
+            }
+          }
+        },
+        cutout: '68%',
+      }
+    });
+
+    // Legend
+    const legend = document.getElementById('status-legend');
+    if (legend) {
+      legend.innerHTML = statusLabels.map((l, i) => `
+        <div class="legend-item">
+          <div class="legend-dot" style="background:${statusColors[i]};"></div>
+          <span>${l}</span>
+          <strong style="color:var(--text-primary);">${statusData[i]}</strong>
+        </div>`).join('');
+    }
+
+    // ─── Timeline Chart ─────────────────────────────────────
+    allDailyTickets = data.daily_tickets || [];
+    renderTimelineChart(allDailyTickets.slice(-30));
+
+    // ─── Priority Bar ───────────────────────────────────────
+    initChart('priorityChart', {
+      type: 'bar',
+      data: {
+        labels: ['Low', 'Medium', 'High', 'Critical'],
+        datasets: [{
+          label: 'Tickets',
+          data: [
+            data.by_priority.low, data.by_priority.medium,
+            data.by_priority.high, data.by_priority.critical
+          ],
+          backgroundColor: [
+            'rgba(34,197,94,0.75)', 'rgba(245,158,11,0.75)',
+            'rgba(239,68,68,0.75)', 'rgba(220,38,38,0.9)'
+          ],
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          y: { grid: { color: 'rgba(148,163,184,0.06)' }, beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } }
+        },
+        interaction: { mode: 'index', intersect: false }
+      }
+    });
+
+    // ─── Category Chart ──────────────────────────────────────
+    const catLabels = Object.keys(data.by_category || {});
+    const catVals   = Object.values(data.by_category || {});
+    const catColors = [C.blue, C.indigo, C.amber, C.green, C.red, C.purple, C.pink].map(c => c + 'bb');
+
+    initChart('categoryChart', {
+      type: 'bar',
+      data: {
+        labels: catLabels,
+        datasets: [{
+          label: 'Tickets',
+          data: catVals,
+          backgroundColor: catColors.slice(0, catLabels.length),
+          borderRadius: 6,
+          borderSkipped: false,
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        indexAxis: 'y',
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { color: 'rgba(148,163,184,0.06)' }, beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } },
+          y: { grid: { display: false }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+
+    // ─── Engineer Chart ───────────────────────────────────────
+    if (data.engineer_stats && data.engineer_stats.length) {
+      const engLabels = data.engineer_stats.map(e => e.name.split(' ')[0]);
+      initChart('engineerChart', {
+        type: 'bar',
+        data: {
+          labels: engLabels,
+          datasets: [
+            {
+              label: 'Assigned',
+              data: data.engineer_stats.map(e => e.assigned),
+              backgroundColor: 'rgba(37,99,235,0.75)',
+              borderRadius: 5
+            },
+            {
+              label: 'Resolved',
+              data: data.engineer_stats.map(e => e.resolved),
+              backgroundColor: 'rgba(34,197,94,0.75)',
+              borderRadius: 5
+            },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: { legend: { position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } } },
+          scales: {
+            x: { grid: { display: false }, ticks: { font: { size: 11 } } },
+            y: { grid: { color: 'rgba(148,163,184,0.06)' }, beginAtZero: true }
+          }
+        }
+      });
+    }
+
+  } catch(err) {
+    console.error('Dashboard load error:', err);
+    showToast('Failed to load dashboard data', 'error');
+  }
+}
+
+// ─── Recent Tickets ───────────────────────────────────────
+async function loadRecentTickets() {
+  const tbody = document.getElementById('recent-tickets-body');
+  try {
+    const resp = await API.get('/api/tickets?per_page=8&sort=created_at&order=desc');
+    if (!resp || !resp.ok) return;
+    const { data } = await resp.json();
+
+    if (!data.tickets.length) {
+      tbody.innerHTML = `
+        <tr><td colspan="6">
+          <div class="empty-state" style="padding:32px;">
+            <div class="empty-icon"><i class="fa-solid fa-ticket"></i></div>
+            <div class="empty-title">No tickets yet</div>
+            <div class="empty-desc">When tickets are created, they'll appear here.</div>
+            <a href="/tickets/new" class="btn btn-primary btn-sm mt-3">Create First Ticket</a>
+          </div>
+        </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = data.tickets.map(t => `
+      <tr onclick="window.location='/tickets/${t.id}'" style="cursor:pointer;" tabindex="0">
+        <td><span class="ticket-number">${escapeHtml(t.ticket_number)}</span></td>
+        <td>
+          <div class="ticket-title" style="max-width:260px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(t.title)}</div>
+          <div class="ticket-meta">${escapeHtml(t.category)}</div>
+        </td>
+        <td><span class="badge-priority badge-${t.priority}">${t.priority}</span></td>
+        <td><span class="badge-status badge-${t.status}">${t.status.replace('_',' ')}</span></td>
+        <td>
+          ${t.assignee
+            ? `<div class="assignee-cell">
+                <div class="assignee-avatar">${escapeHtml(t.assignee.name[0])}</div>
+                <span style="font-size:12.5px;">${escapeHtml(t.assignee.name)}</span>
+              </div>`
+            : `<span style="font-size:12px; color:var(--text-muted); font-style:italic;">Unassigned</span>`
+          }
+        </td>
+        <td><span style="font-size:12px; color:var(--text-muted);">${fmtDate(t.created_at)}</span></td>
+      </tr>`).join('');
+
+  } catch(err) {
+    tbody.innerHTML = `
+      <tr><td colspan="6" style="text-align:center; padding:24px; color:var(--error); font-size:12.5px;">
+        Failed to load tickets. <button onclick="loadRecentTickets()" class="btn btn-ghost btn-sm" style="display:inline;">Retry</button>
+      </td></tr>`;
+  }
+}
+
+// ─── Activity Feed ────────────────────────────────────────
+async function loadActivity() {
+  const feed = document.getElementById('activity-feed');
+  if (!feed) return;
+  try {
+    const resp = await API.get('/api/tickets?per_page=10&sort=updated_at&order=desc');
+    if (!resp || !resp.ok) return;
+    const { data } = await resp.json();
+
+    if (!data.tickets.length) {
+      feed.innerHTML = `<div style="text-align:center; color:var(--text-muted); font-size:12.5px; padding:16px;">No recent activity</div>`;
+      return;
+    }
+
+    const actIcons = { open:'fa-circle-dot', in_progress:'fa-spinner', resolved:'fa-circle-check', closed:'fa-lock' };
+    const actColors= { open:'var(--brand-glow)', in_progress:'var(--warning)', resolved:'var(--success)', closed:'var(--text-muted)' };
+
+    feed.innerHTML = `<div class="timeline">` + data.tickets.map(t => `
+      <div class="activity-item">
+        <div class="activity-dot" style="background:${actColors[t.status] || 'var(--brand)'};border-color:${actColors[t.status] || 'var(--brand)'};"></div>
+        <div class="activity-content">
+          <div class="activity-text">
+            <a href="/tickets/${t.id}" style="color:var(--text-primary); text-decoration:none; font-weight:600; font-size:12.5px;">${escapeHtml(t.title.length > 45 ? t.title.substring(0,45)+'…' : t.title)}</a>
+          </div>
+          <div style="display:flex; gap:6px; margin-top:3px; flex-wrap:wrap;">
+            <span class="badge-status badge-${t.status}" style="font-size:9.5px;">${t.status.replace('_',' ')}</span>
+            <span class="badge-priority badge-${t.priority}" style="font-size:9.5px;">${t.priority}</span>
+          </div>
+          <div class="activity-time">${timeAgo(t.updated_at || t.created_at)}</div>
+        </div>
+      </div>`).join('') + `</div>`;
+
+  } catch(e) {}
+}
+
+// Fix responsive chart grid
+function fixChartLayout() {
+  const row = document.querySelector('.chart-row-1');
+  if (row && window.innerWidth < 900) {
+    row.style.gridTemplateColumns = '1fr';
+  } else if (row) {
+    row.style.gridTemplateColumns = '1fr 1.8fr';
+  }
+}
+window.addEventListener('resize', fixChartLayout);
+fixChartLayout();
+
+// Boot
+loadDashboard();
+loadRecentTickets();
+loadActivity();
+</script>
+{% endblock %}
